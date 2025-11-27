@@ -1,0 +1,50 @@
+# Dependencias 
+vendor/ 
+node_modules/ 
+
+# Archivos de entorno (datos sensibles) 
+.env 
+.env.local 
+.env.production 
+
+# Configuraciones personales de Docker 
+docker-compose.override.yml 
+
+# Logs y registros 
+logs/*.log 
+*.log 
+error_log 
+
+# Archivos de caché y temporales 
+cache/ 
+tmp/ 
+temp/ 
+
+# Subidas de archivos (excepto .gitkeep) 
+uploads/* 
+!uploads/.gitkeep 
+
+# Base de datos 
+*.sql.bak 
+*.db 
+*.sqlite 
+
+# IDEs y editores 
+.vscode/ 
+.idea/ 
+*.swp 
+*.swo 
+*~ 
+
+# Archivos generados por el sistema operativo 
+.DS_Store 
+.DS_Store? 
+._* 
+.Spotlight-V100 
+.Trashes 
+ehthumbs.db 
+Thumbs.db 
+
+# Específicos de PHP 
+*.php~ 
+composer.phar
