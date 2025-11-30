@@ -1,6 +1,7 @@
 # Dependencias 
 vendor/ 
 node_modules/ 
+docs/ 
 
 # Archivos de entorno (datos sensibles) 
 .env 
@@ -28,6 +29,7 @@ uploads/*
 *.sql.bak 
 *.db 
 *.sqlite 
+*.sql
 
 # IDEs y editores 
 .vscode/ 
