@@ -1,0 +1,14 @@
+DirectoryIndex index.php
+Options -MultiViews
+RewriteEngine On
+
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+RewriteRule ^$ index.php [L]
+
+RewriteRule ^dashboard/?$ index.php?vista=dashboard/inicio.php [QSA,L]
+RewriteRule ^clientes/lista/?$ index.php?vista=clientes/lista.php [QSA,L]
+RewriteRule ^clientes/create/?$ index.php?vista=clientes/create.php [QSA,L]
+RewriteRule ^clientes/metricas/([0-9]+)/?$ index.php?vista=clientes/metricas.php&cliente_id=$1 [QSA,L]
