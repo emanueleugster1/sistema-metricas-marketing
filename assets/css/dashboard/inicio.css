@@ -1,0 +1,32 @@
+@import url('../variables.css');
+
+.dashboard-content {
+  padding: var(--spacing-lg);
+  padding-left: var(--spacing-2xl);
+  font-family: var(--font-primary);
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  color: var(--color-gray-800);
+  margin-bottom: var(--spacing-md);
+}
+
+.welcome-title {
+  font-size: var(--font-size-xl);
+  color: var(--color-primary);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.welcome-card {
+  background: var(--color-gray-100);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-base);
+}
+
+.welcome-text {
+  margin: 0;
+}

@@ -1,0 +1,51 @@
+@import url('../variables.css');
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 240px;
+  height: 100vh;
+  background: var(--color-primary-dark);
+  color: var(--color-white);
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.sidebar-inner { flex: 1; }
+
+.sidebar-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sidebar-item {}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-white);
+  text-decoration: none;
+  font-family: var(--font-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--spacing-sm) var(--spacing-sm);
+  border-radius: var(--border-radius-base);
+}
+
+.sidebar-link:hover { background: rgba(255, 255, 255, 0.08); }
+.sidebar-link.active { background: rgba(255, 255, 255, 0.16); }
+.sidebar-link.active .sidebar-text { color: var(--color-white); }
+.sidebar-link.active .sidebar-icon { color: var(--color-white); }
+
+.sidebar-icon { color: var(--color-white); font-size: 1.2rem; }
+
+.sidebar-text { color: var(--color-white); }
+
+.content-with-sidebar { margin-left: 240px; }
