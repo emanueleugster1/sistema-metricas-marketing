@@ -8,6 +8,20 @@ require_once __DIR__ . '/../api/connectors/metaConnector.php';
 require_once __DIR__ . '/../api/connectors/geminiConnector.php';
 require_once __DIR__ . '/../api/ml/RecomendadorML.php';
 
+function DashboardController_buildRecommendations(array $rows): array
+{
+    $ml = new RecomendadorML();
+    $mlText = $ml->recomendar($rows);
+    $env = _readEnvFile(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
+    $apiKey = (string)($env['GEMINI_API_KEY'] ?? getenv('GEMINI_API_KEY') ?: '');
+    $aiText = '';
+    if ($apiKey !== '') {
+        $gemini = new GeminiConnector($apiKey);
+        $aiText = $gemini->translateMetrics(json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'Explica métricas en lenguaje sencillo.');
+    }
+    return ['ml' => (string)$mlText, 'ai' => (string)$aiText];
+}
+
 function DashboardController_widgetsDisponibles(int $plataformaId): array
 {
     $model = new DashboardModel();
@@ -128,13 +142,12 @@ function DashboardController_resumen(int $clienteId, int $usuarioId): array
     $recomMl = '';
     $allRows = $clienteModel->obtenerMetricasPorCliente($clienteId);
     if (!empty($allRows)) {
-        $ml = new RecomendadorML();
-        $recomMl = $ml->recomendar($allRows);
-        $apiKey = 'AIzaSyBh-d9YR55bbHPzHPvfYM84kaNULdpW2n8';
-        if ($apiKey !== '') {
-            $gemini = new GeminiConnector($apiKey);
-            $prompt = 'Traduce al español y explica CPC, CTR, frecuencia e inversión en lenguaje sencillo y directo.';
-            $traduccionAi = $gemini->translateMetrics(json_encode($allRows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), $prompt);
+        $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
+        $filtered = !empty($selected) ? array_values(array_filter($allRows, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
+        if (!empty($filtered)) {
+            $rec = DashboardController_buildRecommendations($filtered);
+            $recomMl = (string)$rec['ml'];
+            $traduccionAi = (string)$rec['ai'];
         }
     }
     $ultimaRec = $clienteModel->obtenerUltimaRecomendacionML($clienteId);
@@ -390,14 +403,12 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         $rowsNow = $mm->obtenerMetricasPorCliente($clienteId);
         $contenido = '';
         if (!empty($rowsNow)) {
-            $ml = new RecomendadorML();
-            $contenido = $ml->recomendar($rowsNow);
-        }
-        if ($contenido === '') {
-            $apiKey = 'AIzaSyBh-d9YR55bbHPzHPvfYM84kaNULdpW2n8';
-            if ($apiKey !== '') {
-                $gemini = new GeminiConnector($apiKey);
-                $contenido = $gemini->translateMetrics(json_encode($rowsNow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'Explica métricas en lenguaje sencillo.');
+            $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
+            $filtered = !empty($selected) ? array_values(array_filter($rowsNow, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
+            if (!empty($filtered)) {
+                $rec = DashboardController_buildRecommendations($filtered);
+                $contenido = (string)$rec['ml'];
+                if ($contenido === '' && (string)$rec['ai'] !== '') { $contenido = (string)$rec['ai']; }
             }
         }
         $mm->insertarRecomendacionML($clienteId, $contenido !== '' ? $contenido : '');
@@ -410,41 +421,6 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         exit;
     }
 
-    if ($method === 'POST' && $action === 'generar_recomendacion_ml') {
-        header('Content-Type: application/json');
-        $clienteId = isset($_POST['cliente_id']) ? (int)$_POST['cliente_id'] : 0;
-        if ($clienteId <= 0) {
-            echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
-            exit;
-        }
-        $mm = new MetricaModel();
-        $cliente = $mm->obtenerClientePorId($clienteId);
-        if ($cliente === null || (int)$cliente['usuario_id'] !== $usuarioId) {
-            echo json_encode(['success' => false, 'error' => 'forbidden']);
-            exit;
-        }
-        $rows = $mm->obtenerMetricasPorCliente($clienteId);
-        $contenido = '';
-        if (!empty($rows)) {
-            $ml = new RecomendadorML();
-            $contenido = $ml->recomendar($rows);
-        }
-        if ($contenido === '') {
-            $apiKey = 'AIzaSyBh-d9YR55bbHPzHPvfYM84kaNULdpW2n8';
-            if ($apiKey !== '') {
-                $gemini = new GeminiConnector($apiKey);
-                $contenido = $gemini->translateMetrics(json_encode($rows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'Explica métricas en lenguaje sencillo.');
-            }
-        }
-        $ok = $mm->insertarRecomendacionML($clienteId, $contenido !== '' ? $contenido : '');
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /clientes/metricas/' . $clienteId);
-            exit;
-        }
-        echo json_encode(['success' => $ok]);
-        exit;
-    }
 
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'error' => 'not_found']);
