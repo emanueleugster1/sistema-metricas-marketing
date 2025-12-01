@@ -311,13 +311,6 @@ function metric_desc(string $metric): string {
     <div class="recom-card"><?php if ($recomAi !== '') { echo nl2br(htmlspecialchars($recomAi, ENT_QUOTES, 'UTF-8')); } else { echo 'Crear Dashboard'; } ?></div>
     <div class="recom-title" style="margin-top: var(--spacing-md);">Recomendación ML</div>
     <div class="recom-card"><?php if ($recomMl !== '') { echo nl2br(htmlspecialchars($recomMl, ENT_QUOTES, 'UTF-8')); } else { echo 'Sin datos suficientes'; } ?></div>
-    <?php /* ?>
-    <form method="post" action="/controllers/dashboardController.php?action=generar_recomendacion_ml" style="margin-top: var(--spacing-md);">
-      <input type="hidden" name="cliente_id" value="<?= (int)$clienteId ?>">
-      <input type="hidden" name="redirect" value="1">
-      <button type="submit" class="btn-primary">Generar Recomendación ML</button>
-    </form>
-    <?php */ ?>
   </section>
     <section class="platform-block">
       <div class="recom-card">
