@@ -12,6 +12,7 @@ $nombre = isset($_SESSION['nombre']) ? (string)$_SESSION['nombre'] : '';
   <title>Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
   <link rel="stylesheet" href="../../assets/css/templates/sidebar.css">
+  <link rel="stylesheet" href="../../assets/css/templates/buttons.css">
   <link rel="stylesheet" href="../../assets/css/dashboard/inicio.css">
 </head>
 <body>
@@ -20,10 +21,12 @@ $nombre = isset($_SESSION['nombre']) ? (string)$_SESSION['nombre'] : '';
     <div class="dashboard-header">
       <span><?= htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8'); ?></span>
     </div>
-    <h1 class="welcome-title">Inicio</h1>
-    <section class="welcome-card">
-      <p class="welcome-text">Bienvenido al sistema de centralización de métricas.</p>
-    </section>
+    <div class="page-card">
+      <h1 class="welcome-title">Inicio</h1>
+      <section class="welcome-card">
+        <p class="welcome-text">Bienvenido al sistema de centralización de métricas.</p>
+      </section>
+    </div>
   </main>
 </body>
 </html>

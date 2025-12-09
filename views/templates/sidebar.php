@@ -31,3 +31,4 @@ $isClientes = str_starts_with($currentVista, 'clientes/');
   </div>
   <!-- Estilos via assets/css en vistas que incluyan este template -->
 </aside>
+<script src="../../assets/js/templates/sidebar.js"></script>

@@ -9,6 +9,7 @@ $activoVal = isset($cliente['activo']) ? (int)$cliente['activo'] : 1;
   <div class="create-header">
     <a class="btn-back" href="/index.php?vista=clientes/lista.php">Atrás</a>
   </div>
+  <div class="page-card">
   <form id="cliente-form" method="post" action="<?= $actionUrl ?>">
     <input type="hidden" name="redirect" value="1">
     <?php if (!empty($cliente) && isset($cliente['id'])): ?>
@@ -42,11 +43,13 @@ $activoVal = isset($cliente['activo']) ? (int)$cliente['activo'] : 1;
             </label>
           <?php endforeach; ?>
         </div>
+      </div>
+      <div class="form-column">
         <div id="meta-detect-wrap" class="form-field" style="display:none;">
           <label>Access token (Meta)</label>
           <input type="text" id="meta-access-token" placeholder="Token personal...">
           <div style="margin-top: var(--spacing-sm);">
-            <button type="button" id="meta-detect-btn" class="btn-submit">Detectar opciones disponibles</button>
+            <button type="button" id="meta-detect-btn" class="btn btn-primary">Detectar opciones disponibles</button>
           </div>
         </div>
         <div id="meta-selects" class="meta-selects" style="display:none;">
@@ -58,10 +61,6 @@ $activoVal = isset($cliente['activo']) ? (int)$cliente['activo'] : 1;
             <label>Selecciona cuenta publicitaria</label>
             <select id="meta-adaccount-select"></select>
           </div>
-          <div class="form-field">
-            <label>Instagram Business ID</label>
-            <input type="text" id="meta-instagram-id" readonly>
-          </div>
         </div>
         <div id="credenciales-container" class="credenciales-section">
           <?php foreach ($plataformas as $p): ?>
@@ -69,20 +68,24 @@ $activoVal = isset($cliente['activo']) ? (int)$cliente['activo'] : 1;
             <div class="cred-card" data-plataforma-id="<?= $pid ?>" style="<?= $checked ? '' : 'display:none;' ?>">
               <div class="cred-title">Credenciales <?= htmlspecialchars((string)$p['nombre'], ENT_QUOTES, 'UTF-8') ?></div>
               <?php foreach ($campos as $c): ?>
-                <?php $nombreCampo = (string)$c['nombre_campo']; $val = $credencialesMap[$pid][$nombreCampo] ?? ''; ?>
+                <?php 
+                  $nombreCampo = (string)$c['nombre_campo'];
+                  $labelCampo = (string)$c['label'];
+                  $val = $credencialesMap[$pid][$nombreCampo] ?? ''; 
+                ?>
                 <div class="form-field">
-                  <label><?= htmlspecialchars($nombreCampo, ENT_QUOTES, 'UTF-8') ?></label>
-                  <input type="text" name="cred[<?= $pid ?>][<?= htmlspecialchars($nombreCampo, ENT_QUOTES, 'UTF-8') ?>]" value="<?= htmlspecialchars((string)$val, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars($nombreCampo, ENT_QUOTES, 'UTF-8') ?>..." <?= $checked ? '' : 'disabled' ?> readonly>
+                  <label><?= htmlspecialchars($labelCampo, ENT_QUOTES, 'UTF-8') ?></label>
+                  <input type="text" name="cred[<?= $pid ?>][<?= htmlspecialchars($nombreCampo, ENT_QUOTES, 'UTF-8') ?>]" value="<?= htmlspecialchars((string)$val, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars($labelCampo, ENT_QUOTES, 'UTF-8') ?>..." <?= $checked ? '' : 'disabled' ?> readonly>
                 </div>
               <?php endforeach; ?>
             </div>
           <?php endforeach; ?>
         </div>
       </div>
-      <div class="form-column"></div>
     </div>
     <div class="actions">
-      <button type="submit" class="btn-submit">Guardar</button>
+      <button type="submit" class="btn btn-primary no-global-loading">Guardar</button>
     </div>
   </form>
+  </div>
 </main>
