@@ -57,6 +57,43 @@ final class MetricaModel
         return $stmt->fetchAll() ?: [];
     }
 
+    public function hayMetricasRecientes(int $clienteId, int $dias = 7): bool
+    {
+        $dias = max(1, $dias);
+        $sql = 'SELECT 1 FROM metricas WHERE cliente_id = ? AND plataforma_id = 5 AND fecha_creacion >= (NOW() - INTERVAL ? DAY) LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId, $dias]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    public function obtenerValorAnteriorMetrica(int $clienteId, int $plataformaId, string $nombreMetrica): ?float
+    {
+        $sql = 'SELECT valor
+                FROM metricas
+                WHERE cliente_id = ? AND plataforma_id = ? AND nombre_metrica = ?
+                ORDER BY fecha_metrica DESC, id DESC
+                LIMIT 1 OFFSET 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId, $plataformaId, $nombreMetrica]);
+        $row = $stmt->fetch();
+        if (!$row) { return null; }
+        $val = $row['valor'] ?? null;
+        return is_numeric($val) ? (float)$val : null;
+    }
+
+    public function obtenerUltimaMetrica(int $clienteId, int $plataformaId, string $nombreMetrica): ?array
+    {
+        $sql = 'SELECT id, cliente_id, plataforma_id, fecha_metrica, nombre_metrica, valor, unidad, fecha_extraccion, fecha_creacion
+                FROM metricas
+                WHERE cliente_id = ? AND plataforma_id = ? AND nombre_metrica = ?
+                ORDER BY fecha_metrica DESC, id DESC
+                LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId, $plataformaId, $nombreMetrica]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
     public function guardarMetricas(int $clienteId, array $metricas): bool
     {
         if (empty($metricas)) return true;

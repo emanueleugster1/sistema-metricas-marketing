@@ -23,7 +23,7 @@ final class DashboardModel
 
     public function obtenerWidgetsPorDashboard(int $dashboardId): array
     {
-        $sql = 'SELECT dw.widget_id, dw.visible, dw.orden, w.nombre, w.tipo_visualizacion, w.metrica_principal
+        $sql = 'SELECT dw.widget_id, dw.visible, dw.orden, w.nombre, w.descripcion, w.tipo_visualizacion, w.metrica_principal
                 FROM dashboard_widgets dw
                 INNER JOIN widgets w ON w.id = dw.widget_id
                 WHERE dw.dashboard_id = ?

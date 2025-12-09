@@ -41,11 +41,11 @@ class ClienteModel
     public function obtenerPorId(int $id, ?int $usuarioId = null): ?array
     {
         if ($usuarioId !== null) {
-            $sql = 'SELECT id, usuario_id, nombre, sector, activo, fecha_creacion FROM clientes WHERE id = ? AND usuario_id = ? LIMIT 1';
+            $sql = 'SELECT * FROM clientes WHERE id = ? AND usuario_id = ? LIMIT 1';
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$id, $usuarioId]);
         } else {
-            $sql = 'SELECT id, usuario_id, nombre, sector, activo, fecha_creacion FROM clientes WHERE id = ? LIMIT 1';
+            $sql = 'SELECT * FROM clientes WHERE id = ? LIMIT 1';
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$id]);
         }
@@ -84,7 +84,7 @@ class ClienteModel
 
     public function obtenerCamposPorPlataforma(int $plataformaId): array
     {
-        $sql = 'SELECT id, plataforma_id, nombre_campo, tipo FROM plataforma_campos WHERE plataforma_id = ? ORDER BY id ASC';
+        $sql = 'SELECT id, plataforma_id, nombre_campo, tipo, label FROM plataforma_campos WHERE plataforma_id = ? ORDER BY id ASC';
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$plataformaId]);
         $rows = $stmt->fetchAll();
