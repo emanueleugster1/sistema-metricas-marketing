@@ -127,120 +127,51 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         exit;
     }
 
-    if ($method === 'POST' && $action === 'crear') {
-    header('Content-Type: application/json');
-    $nombre = trim((string)($_POST['nombre'] ?? ''));
-    $sector = isset($_POST['sector']) ? trim((string)$_POST['sector']) : null;
-    $activo = isset($_POST['activo']) ? (bool)$_POST['activo'] : true;
-    if ($nombre === '') {
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/create.php&error=nombre_required');
-            exit;
-        }
-        echo json_encode(['success' => false, 'error' => 'nombre_required']);
-        exit;
-    }
-    $ok = $model->crear($usuarioId, $nombre, $sector, $activo);
-    if ($ok && isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-        header_remove('Content-Type');
-        header('Location: /index.php?vista=clientes/lista.php');
-        exit;
-    }
-    echo json_encode(['success' => $ok]);
-    exit;
-    }
 
     if ($method === 'POST' && $action === 'crear_con_credenciales') {
     header('Content-Type: application/json');
+    
     $nombre = trim((string)($_POST['nombre'] ?? ''));
     $sector = isset($_POST['sector']) ? trim((string)$_POST['sector']) : null;
     $activo = isset($_POST['activo']) ? (bool)$_POST['activo'] : true;
-    $credStr = (string)($_POST['credenciales'] ?? '');
-    $credPost = isset($_POST['cred']) && is_array($_POST['cred']) ? $_POST['cred'] : null;
-    $cred = $credStr !== '' ? json_decode($credStr, true) : ($credPost ?? []);
-    if ($nombre === '' || !is_array($cred)) {
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/create.php&error=invalid_payload');
-            exit;
-        }
-        echo json_encode(['success' => false, 'error' => 'invalid_payload']);
+    $credPost = isset($_POST['cred']) && is_array($_POST['cred']) ? $_POST['cred'] : [];
+    
+    if ($nombre === '') {
+        echo json_encode(['success' => false, 'error' => 'Nombre es requerido']);
         exit;
     }
-    $ok = $model->crearClienteConCredenciales($usuarioId, $nombre, $sector, $activo, $cred);
-    if ($ok && isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-        header_remove('Content-Type');
-        header('Location: /index.php?vista=clientes/lista.php');
-        exit;
-    }
+    
+    $ok = $model->crearClienteConCredenciales($usuarioId, $nombre, $sector, $activo, $credPost);
     echo json_encode(['success' => $ok]);
     exit;
     }
 
     if ($method === 'POST' && $action === 'actualizar_con_credenciales') {
     header('Content-Type: application/json');
+    
     $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
     $nombre = trim((string)($_POST['nombre'] ?? ''));
     $sector = isset($_POST['sector']) ? trim((string)$_POST['sector']) : null;
     $activo = isset($_POST['activo']) ? (bool)$_POST['activo'] : true;
-    $credStr = (string)($_POST['credenciales'] ?? '');
-    $credPost = isset($_POST['cred']) && is_array($_POST['cred']) ? $_POST['cred'] : null;
-    $cred = $credStr !== '' ? json_decode($credStr, true) : ($credPost ?? []);
-    if ($id <= 0 || $nombre === '' || !is_array($cred)) {
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/editar.php&cliente_id=' . $id . '&error=invalid_payload');
-            exit;
-        }
-        echo json_encode(['success' => false, 'error' => 'invalid_payload']);
+    $credPost = isset($_POST['cred']) && is_array($_POST['cred']) ? $_POST['cred'] : [];
+    
+    if ($id <= 0 || $nombre === '') {
+        echo json_encode(['success' => false, 'error' => 'Datos inválidos']);
         exit;
     }
-    // Validar pertenencia del cliente al usuario
+    
+    // Validar que el cliente pertenece al usuario
     $cliente = $model->obtenerPorId($id, $usuarioId);
     if ($cliente === null) {
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/editar.php&cliente_id=' . $id . '&error=not_found');
-            exit;
-        }
-        echo json_encode(['success' => false, 'error' => 'not_found']);
+        echo json_encode(['success' => false, 'error' => 'Cliente no encontrado']);
         exit;
     }
-    $ok = $model->actualizarClienteConCredenciales($id, $usuarioId, $nombre, $sector, $activo, $cred);
-    if ($ok && isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-        header_remove('Content-Type');
-        header('Location: /index.php?vista=clientes/lista.php');
-        exit;
-    }
+    
+    $ok = $model->actualizarClienteConCredenciales($id, $usuarioId, $nombre, $sector, $activo, $credPost);
     echo json_encode(['success' => $ok]);
     exit;
     }
 
-    if ($method === 'POST' && $action === 'actualizar') {
-    header('Content-Type: application/json');
-    $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-    $nombre = trim((string)($_POST['nombre'] ?? ''));
-    $sector = isset($_POST['sector']) ? trim((string)$_POST['sector']) : null;
-    $activo = isset($_POST['activo']) ? (bool)$_POST['activo'] : true;
-    if ($id <= 0 || $nombre === '') {
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/editar.php&cliente_id=' . $id . '&error=invalid_payload');
-            exit;
-        }
-        echo json_encode(['success' => false, 'error' => 'invalid_payload']);
-        exit;
-    }
-    $ok = $model->actualizar($id, $usuarioId, $nombre, $sector, $activo);
-    if ($ok && isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-        header_remove('Content-Type');
-        header('Location: /index.php?vista=clientes/lista.php');
-        exit;
-    }
-    echo json_encode(['success' => $ok]);
-    exit;
-    }
 
     if ($method === 'POST' && $action === 'eliminar') {
     header('Content-Type: application/json');

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/databaseConfig.php';
 require_once __DIR__ . '/../models/metricaModel.php';
+require_once __DIR__ . '/../models/dashboardModel.php';
+require_once __DIR__ . '/dashboardController.php';
 require_once __DIR__ . '/../api/connectors/metaConnector.php';
 
 function MetricaController_resumen(int $clienteId, int $usuarioId): array
@@ -97,6 +99,42 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
 
         $data = MetricaController_resumen($clienteId, $usuarioId);
         echo json_encode($data);
+        exit;
+    }
+
+    if ($method === 'GET' && $action === 'widgets_data') {
+        header('Content-Type: application/json');
+        $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
+        $dias = isset($_GET['dias']) ? (int)$_GET['dias'] : 30;
+
+        if ($clienteId <= 0) {
+            echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
+            exit;
+        }
+
+        // 1. Verificar métricas antiguas y actualizar si es necesario
+        $metricaModel = new MetricaModel();
+        if (!$metricaModel->hayMetricasRecientes($clienteId, 7)) {
+            DashboardController_extraerYGuardarTodas($clienteId, $usuarioId);
+        }
+
+        // 2. Obtener widgets del dashboard del cliente
+        $dashModel = new DashboardModel();
+        $dashboard = $dashModel->obtenerDashboardPorCliente($clienteId);
+        $widgets = [];
+        if ($dashboard) {
+            $widgets = $dashModel->obtenerWidgetsPorDashboard((int)$dashboard['id']);
+        }
+
+        // 3. Obtener métricas históricas
+        // $metricaModel ya fue instanciado arriba
+        $metricasHistoricas = $metricaModel->obtenerMetricasHistoricas($clienteId, $dias);
+
+        echo json_encode([
+            'success' => true,
+            'widgets' => $widgets,
+            'metricasHistoricas' => $metricasHistoricas
+        ]);
         exit;
     }
 
