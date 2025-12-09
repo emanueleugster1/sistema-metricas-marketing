@@ -7,9 +7,10 @@ use Phpml\Regression\LeastSquares;
 
 final class RecomendadorML
 {
-    public function recomendar(array $rows): string
+    public function recomendar(array $rows, array $featureKeys = []): string
     {
         $byDate = [];
+        $unitsByKey = [];
         foreach ($rows as $r) {
             $d = (string)($r['fecha_metrica'] ?? '');
             $name = (string)($r['nombre_metrica'] ?? '');
@@ -17,10 +18,13 @@ final class RecomendadorML
             if ($d === '' || $name === '' || !is_numeric($val)) continue;
             if (!isset($byDate[$d])) $byDate[$d] = [];
             $byDate[$d][$name] = (float)$val;
+            $unit = (string)($r['unidad'] ?? '');
+            if ($unit !== '') { $unitsByKey[$name] = $unit; }
         }
         if (empty($byDate)) return '';
         krsort($byDate);
-        $featuresOrder = ['impressions','clicks','spend','cpc','cpm','frequency','inline_link_clicks'];
+        $featuresOrder = array_values(array_filter(array_unique(array_map('strval', $featureKeys)), function($k){ return $k !== 'ctr' && $k !== ''; }));
+        $target = in_array('ctr', $featureKeys, true) ? 'ctr' : null;
 
         $X = [];
         $y = [];
@@ -29,7 +33,7 @@ final class RecomendadorML
             $fv = [];
             foreach ($featuresOrder as $f) { $fv[] = isset($m[$f]) && is_numeric($m[$f]) ? (float)$m[$f] : 0.0; }
             $allFeatureRows[] = $fv;
-            if (isset($m['ctr']) && is_numeric($m['ctr'])) { $y[] = (float)$m['ctr']; $X[] = $fv; }
+            if ($target !== null && isset($m[$target]) && is_numeric($m[$target])) { $y[] = (float)$m[$target]; $X[] = $fv; }
         }
         $trained = false;
         $model = null;
@@ -38,42 +42,50 @@ final class RecomendadorML
         $latestMap = reset($byDate) ?: [];
         $latest = $allFeatureRows[0] ?? null;
 
-        $ctrActual = isset($latestMap['ctr']) && is_numeric($latestMap['ctr']) ? (float)$latestMap['ctr'] : null;
-        $cpcActual = isset($latestMap['cpc']) && is_numeric($latestMap['cpc']) ? (float)$latestMap['cpc'] : null;
-        $cpmActual = isset($latestMap['cpm']) && is_numeric($latestMap['cpm']) ? (float)$latestMap['cpm'] : null;
-        $freqActual = isset($latestMap['frequency']) && is_numeric($latestMap['frequency']) ? (float)$latestMap['frequency'] : null;
-        $spendActual = isset($latestMap['spend']) && is_numeric($latestMap['spend']) ? (float)$latestMap['spend'] : null;
-        $clicksActual = isset($latestMap['clicks']) && is_numeric($latestMap['clicks']) ? (float)$latestMap['clicks'] : null;
-        $imprActual = isset($latestMap['impressions']) && is_numeric($latestMap['impressions']) ? (float)$latestMap['impressions'] : null;
+        
 
         $predCtr = null;
-        if ($trained && $latest) { $predCtr = (float)$model->predict($latest); }
+        if ($trained && $latest && $target === 'ctr') { $predCtr = (float)$model->predict($latest); }
 
-        $medCtr = $this->median($this->collectMetric($byDate, 'ctr'));
-        $medCpc = $this->median($this->collectMetric($byDate, 'cpc'));
-        $medCpm = $this->median($this->collectMetric($byDate, 'cpm'));
-        $medFreq = $this->median($this->collectMetric($byDate, 'frequency'));
+        
 
-        $p1 = 'Resumen de rendimiento: ' .
-              'CTR ' . $this->fmt($ctrActual, '%') . ', ' .
-              'CPC ' . $this->fmt($cpcActual) . ', ' .
-              'CPM ' . $this->fmt($cpmActual) . ', ' .
-              'Frecuencia ' . $this->fmt($freqActual) . ', ' .
-              'Clicks ' . $this->fmt($clicksActual) . ', ' .
-              'Impresiones ' . $this->fmt($imprActual) . ', ' .
-              'Inversión ' . $this->fmt($spendActual) . '.';
+        $p1Parts = [];
+        $summaryKeys = $featuresOrder;
+        foreach ($summaryKeys as $k) {
+            $v = isset($latestMap[$k]) && is_numeric($latestMap[$k]) ? (float)$latestMap[$k] : null;
+            if ($v === null) continue;
+            $label = ucfirst(str_replace('_',' ',$k));
+            $suffix = ((string)($unitsByKey[$k] ?? '') === '%') ? '%' : '';
+            $p1Parts[] = $label . ' ' . $this->fmt($v, $suffix);
+        }
+        $p1 = 'Resumen de rendimiento: ' . (empty($p1Parts) ? 'n/d' : implode(', ', $p1Parts)) . '.';
 
-        $p2 = 'Comparativa histórica: ' .
-              'CTR mediano ' . $this->fmt($medCtr, '%') . ', ' .
-              'CPC mediano ' . $this->fmt($medCpc) . ', ' .
-              'CPM mediano ' . $this->fmt($medCpm) . ', ' .
-              'Frecuencia mediana ' . $this->fmt($medFreq) . '.';
+        $p2Parts = [];
+        $medians = [];
+        foreach ($summaryKeys as $k) {
+            $vals = $this->collectMetric($byDate, $k);
+            $med = $this->median($vals);
+            if ($med === null) continue;
+            $medians[$k] = (float)$med;
+            $label = ucfirst(str_replace('_',' ',$k)) . ' mediano ';
+            $suffix = ((string)($unitsByKey[$k] ?? '') === '%') ? '%' : '';
+            $p2Parts[] = $label . $this->fmt($med, $suffix);
+        }
+        $p2 = 'Comparativa histórica: ' . (empty($p2Parts) ? 'no disponible.' : (implode(', ', $p2Parts) . '.'));
 
-        $p3 = $predCtr !== null ? ('Proyección: CTR estimado ' . $this->fmt($predCtr, '%') . '.') : 'Proyección: no disponible por falta de datos etiquetados.';
+        $p3 = '';
+        if ($predCtr !== null) {
+            $label = ucfirst(str_replace('_',' ', $target));
+            $suffix = ((string)($unitsByKey[$target] ?? '') === '%') ? '%' : '';
+            $p3 = 'Proyección: estimado de ' . $label . ' ' . $this->fmt($predCtr, $suffix) . '.';
+        }
 
-        $p4 = $this->diagnostico($ctrActual, $medCtr, $cpcActual, $medCpc, $cpmActual, $medCpm, $freqActual, $medFreq);
+        $p4 = $this->diagnostico($latestMap, $medians, $summaryKeys);
 
-        return $p1 . "\n\n" . $p2 . "\n\n" . $p3 . "\n\n" . $p4;
+        $parts = [$p1, $p2];
+        if ($p3 !== '') { $parts[] = $p3; }
+        $parts[] = $p4;
+        return implode("\n\n", $parts);
     }
 
     private function collectMetric(array $byDate, string $name): array
@@ -100,15 +112,27 @@ final class RecomendadorML
         return $suffix === '' ? $s : ($s . $suffix);
     }
 
-    private function diagnostico(?float $ctr, ?float $medCtr, ?float $cpc, ?float $medCpc, ?float $cpm, ?float $medCpm, ?float $freq, ?float $medFreq): string
+    private function diagnostico(array $latestMap, array $medians, array $keys): string
     {
+        $entries = [];
+        foreach ($keys as $k) {
+            $cur = isset($latestMap[$k]) && is_numeric($latestMap[$k]) ? (float)$latestMap[$k] : null;
+            $med = isset($medians[$k]) ? (float)$medians[$k] : null;
+            if ($cur === null || $med === null || $med == 0.0) continue;
+            $ratio = ($cur - $med) / $med;
+            $entries[] = ['key' => $k, 'ratio' => $ratio, 'cur' => $cur, 'med' => $med];
+        }
+        usort($entries, function($a, $b){ return abs($b['ratio']) <=> abs($a['ratio']); });
         $msgs = [];
-        if ($ctr !== null && $medCtr !== null && $ctr < $medCtr) $msgs[] = 'El CTR está por debajo del histórico; revisar segmentación y creatividades.';
-        if ($cpc !== null && $medCpc !== null && $cpc > $medCpc) $msgs[] = 'El CPC está por encima del histórico; optimizar pujas y anuncios.';
-        if ($cpm !== null && $medCpm !== null && $cpm > $medCpm) $msgs[] = 'El CPM es alto; ajustar audiencias o formatos.';
-        if ($freq !== null && $freq > 2.0) $msgs[] = 'La frecuencia es elevada; considerar rotación de anuncios para evitar saturación.';
-        if (empty($msgs)) $msgs[] = 'El rendimiento es consistente con el histórico.';
+        $limit = 3;
+        for ($i = 0; $i < min($limit, count($entries)); $i++) {
+            $e = $entries[$i];
+            $label = ucfirst(str_replace('_',' ', $e['key']));
+            $dir = $e['ratio'] >= 0 ? 'por encima' : 'por debajo';
+            $percent = number_format(abs($e['ratio'])*100, 0, ',', '.');
+            $msgs[] = $label . ' ' . $dir . ' del histórico (' . $percent . '%).';
+        }
+        if (empty($msgs)) { $msgs[] = 'El rendimiento es consistente con el histórico.'; }
         return implode(' ', $msgs);
     }
 }
-
