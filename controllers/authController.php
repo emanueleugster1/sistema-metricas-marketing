@@ -42,7 +42,7 @@ if ($user !== null) {
     $_SESSION['usuario_id'] = (int)$user['id'];
     $_SESSION['nombre'] = (string)$user['nombre'];
     $_SESSION['email'] = (string)$user['email'];
-    header('Location: ../index.php');
+    header('Location: /dashboard');
     exit;
 }
 

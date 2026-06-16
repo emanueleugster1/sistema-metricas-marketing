@@ -1,5 +1,10 @@
 <?php
 session_start();
+// Usuario ya autenticado: rebota al dashboard antes de renderizar el formulario.
+if (isset($_SESSION['usuario_id'])) {
+    header('Location: /dashboard');
+    exit;
+}
 $error = isset($_SESSION['login_error']) ? (string)$_SESSION['login_error'] : '';
 if ($error !== '') { unset($_SESSION['login_error']); }
 ?>
