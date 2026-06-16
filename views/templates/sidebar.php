@@ -2,21 +2,21 @@
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
-$currentVista = isset($_GET['vista']) ? (string)$_GET['vista'] : 'dashboard/inicio.php';
-$isInicio = str_starts_with($currentVista, 'dashboard/inicio.php');
-$isClientes = str_starts_with($currentVista, 'clientes/');
+$currentPath = (string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$isInicio = $currentPath === '/' || str_starts_with($currentPath, '/dashboard');
+$isClientes = str_starts_with($currentPath, '/clientes');
 ?>
 <aside class="sidebar" role="navigation" aria-label="Menú principal">
   <div class="sidebar-inner">
     <ul class="sidebar-menu">
       <li class="sidebar-item">
-        <a class="sidebar-link<?= $isInicio ? ' active' : '' ?>" href="/index.php?vista=dashboard/inicio.php">
+        <a class="sidebar-link<?= $isInicio ? ' active' : '' ?>" href="/dashboard">
           <span class="sidebar-icon"><i class="bi bi-house-fill"></i></span>
           <span class="sidebar-text">Inicio</span>
         </a>
       </li>
       <li class="sidebar-item">
-        <a class="sidebar-link<?= $isClientes ? ' active' : '' ?>" href="/index.php?vista=clientes/lista.php">
+        <a class="sidebar-link<?= $isClientes ? ' active' : '' ?>" href="/clientes/lista">
           <span class="sidebar-icon"><i class="bi bi-person-fill"></i></span>
           <span class="sidebar-text">Clientes</span>
         </a>

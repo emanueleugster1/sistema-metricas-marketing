@@ -1,14 +1,44 @@
 DirectoryIndex index.php
-Options -MultiViews
+Options -MultiViews -Indexes
+
+# === Seguridad: bloqueo de acceso directo por URL (Apache 2.4) ===
+# Devuelven 403 ante peticiones directas a archivos sensibles.
+# Son directivas de control de acceso (fase de autorizacion): NO interfieren
+# con el routing de mod_rewrite hacia el front controller.
+
+# Archivos de entorno: .env, .env.local, .env.production, etc.
+<FilesMatch "^\.env(\..*)?$">
+    Require all denied
+</FilesMatch>
+
+# Volcados y scripts SQL: create_database_metricas.sql, fix.sql, etc.
+<FilesMatch "\.sql$">
+    Require all denied
+</FilesMatch>
+
+# Cualquier dotfile (.htaccess, .gitignore, .DS_Store, .env, ...)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
 RewriteEngine On
 
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
+# Seguridad: 403 ante acceso directo por URL a carpetas internas.
+# Estas carpetas solo se usan via require/include desde PHP, nunca por HTTP.
+# (NO se incluyen controllers/ ni api/, que SI se invocan por URL.)
+RewriteRule ^(config|models|includes|logs)(/|$) - [F,L]
 
-RewriteRule ^$ index.php [L]
+# Seguridad: bloquear acceso directo por HTTP a las vistas (cierra el bypass
+# del gate de auth). Las vistas se renderizan via include desde index.php,
+# nunca por peticion directa. Excepcion: la pantalla de login, que SI se
+# sirve directa (el gate redirige a ella).
+RewriteRule ^views/auth/login\.php$ - [L]
+RewriteRule ^views/ - [F,L]
 
-RewriteRule ^dashboard/?$ index.php?vista=dashboard/inicio.php [QSA,L]
-RewriteRule ^clientes/lista/?$ index.php?vista=clientes/lista.php [QSA,L]
-RewriteRule ^clientes/create/?$ index.php?vista=clientes/create.php [QSA,L]
-RewriteRule ^clientes/metricas/([0-9]+)/?$ index.php?vista=clientes/metricas.php&cliente_id=$1 [QSA,L]
+# Front controller: toda peticion que NO sea archivo o directorio real
+# se enruta a index.php, que resuelve la ruta segun su tabla interna.
+# Los archivos reales (controllers/*.php, api/*.php, assets, etc.) se sirven
+# directos al no cumplir esta condicion.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L,QSA]

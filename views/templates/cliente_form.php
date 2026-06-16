@@ -7,7 +7,7 @@ $activoVal = isset($cliente['activo']) ? (int)$cliente['activo'] : 1;
 ?>
 <main class="content-with-sidebar clientes-create">
   <div class="create-header">
-    <a class="btn-back" href="/index.php?vista=clientes/lista.php">Atrás</a>
+    <a class="btn-back" href="/clientes/lista">Atrás</a>
   </div>
   <div class="page-card">
   <form id="cliente-form" method="post" action="<?= $actionUrl ?>">

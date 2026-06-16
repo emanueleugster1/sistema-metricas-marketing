@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (result.success) {
           // Redirigir a lista de clientes
-          window.location.href = '/index.php?vista=clientes/lista.php';
+          window.location.href = '/clientes/lista';
         } else {
           // Mostrar error
           alert('Error: ' + (result.error || 'Error desconocido'));

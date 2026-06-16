@@ -148,7 +148,7 @@ function format_value($val, string $metric, string $currency): string {
       <div>
         <div class="title"><?= $cliente ? htmlspecialchars((string)$cliente['nombre'], ENT_QUOTES, 'UTF-8') : 'Cliente' ?><?= $cliente && $cliente['sector'] ? ' - ' . htmlspecialchars((string)$cliente['sector'], ENT_QUOTES, 'UTF-8') : '' ?></div>
       </div>
-      <a class="btn btn-secondary" href="/index.php?vista=clientes/lista.php">Atrás</a>
+      <a class="btn btn-secondary" href="/clientes/lista">Atrás</a>
     </div>
     <div class="page-card">
 

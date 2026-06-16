@@ -417,7 +417,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         }
         if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
             header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/metricas.php&cliente_id=' . $clienteId);
+            header('Location: /clientes/metricas/' . $clienteId);
             exit;
         }
         echo json_encode(['success' => true, 'dashboard_id' => $dId]);
@@ -475,7 +475,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         $mm->insertarRecomendacionML($clienteId, $contenido !== '' ? $contenido : '');
         if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
             header_remove('Content-Type');
-            header('Location: /index.php?vista=clientes/metricas.php&cliente_id=' . $clienteId);
+            header('Location: /clientes/metricas/' . $clienteId);
             exit;
         }
         echo json_encode(['success' => (bool)$res['success'], 'inserted' => (int)$res['inserted']]);
