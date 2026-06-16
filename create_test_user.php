@@ -17,11 +17,12 @@ try {
     if ($exists > 0) {
         echo "El usuario ya existe: " . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . "<br>";
     } else {
-        $stmt = $pdo->prepare('INSERT INTO usuarios (nombre, email, password_hash) VALUES (:nombre, :email, PASSWORD(:password))');
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare('INSERT INTO usuarios (nombre, email, password_hash) VALUES (:nombre, :email, :password_hash)');
         $ok = $stmt->execute([
             ':nombre' => $nombre,
             ':email' => $email,
-            ':password' => $password,
+            ':password_hash' => $hash,
         ]);
         if ($ok) {
             echo "Usuario de prueba creado con éxito. ID: " . htmlspecialchars($pdo->lastInsertId(), ENT_QUOTES, 'UTF-8') . "<br>";

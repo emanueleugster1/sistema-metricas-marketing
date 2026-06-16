@@ -14,11 +14,18 @@ class UsuarioModel
 
     public function validarCredenciales(string $email, string $password): ?array
     {
-        $sql = 'SELECT id, nombre, email, activo, fecha_creacion FROM usuarios WHERE email = ? AND password_hash = PASSWORD(?) AND activo = 1 LIMIT 1';
+        $sql = 'SELECT id, nombre, email, activo, fecha_creacion, password_hash FROM usuarios WHERE email = ? AND activo = 1 LIMIT 1';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$email, $password]);
+        $stmt->execute([$email]);
         $row = $stmt->fetch();
-        return $row !== false ? $row : null;
+        if ($row === false) {
+            return null;
+        }
+        if (!password_verify($password, (string)$row['password_hash'])) {
+            return null;
+        }
+        unset($row['password_hash']);
+        return $row;
     }
 
     public function obtenerPorId(int $id): ?array
