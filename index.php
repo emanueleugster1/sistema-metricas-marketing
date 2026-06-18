@@ -17,6 +17,20 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
+// --- Expiracion de sesion por inactividad (seccion de Seguridad) ---
+// La sesion expira tras 8 horas sin actividad. Cada request renueva el contador
+// (la marca se actualiza abajo), asi que mientras se use el sistema no expira.
+$inactividadMaxSeg = 8 * 3600; // 8 horas (ajustable)
+$ahora = time();
+if (isset($_SESSION['ultima_actividad']) && ($ahora - (int)$_SESSION['ultima_actividad']) > $inactividadMaxSeg) {
+    $_SESSION = [];
+    session_regenerate_id(true);
+    $_SESSION['login_error'] = 'Tu sesión expiró por inactividad. Iniciá sesión nuevamente.';
+    header('Location: /views/auth/login.php');
+    exit;
+}
+$_SESSION['ultima_actividad'] = $ahora; // renueva el contador en cada request valido
+
 // Evita que el navegador sirva vistas autenticadas desde cache tras cerrar
 // sesion (de lo contrario el gate no llega a ejecutarse en esa navegacion).
 header('Cache-Control: no-store, no-cache, must-revalidate');

@@ -35,15 +35,54 @@ if ($email === '' || $password === '') {
 }
 
 $model = new UsuarioModel();
+
+// --- Bloqueo de cuenta por intentos fallidos (seccion de Seguridad) ---
+// Criterio (ajustable): 5 intentos fallidos consecutivos bloquean la cuenta
+// por 30 minutos.
+$maxIntentos = 5;
+$minutosBloqueo = 30;
+
+$bloqueo = $model->obtenerBloqueoPorEmail($email);
+
+// 1) Si la cuenta esta bloqueada (restante > 0), rechazar SIN verificar la contrasena.
+if ($bloqueo !== null) {
+    $restanteSeg = (int)$bloqueo['bloqueo_restante_seg'];
+    if ($restanteSeg > 0) {
+        $minutosRestantes = (int)ceil($restanteSeg / 60);
+        $_SESSION['login_error'] = 'Cuenta bloqueada por demasiados intentos fallidos. Probá de nuevo en ' . $minutosRestantes . ' min.';
+        header('Location: ../views/auth/login.php');
+        exit;
+    }
+    // Bloqueo vencido (el contador estaba en el maximo): reiniciar para dar intentos frescos.
+    if ((int)$bloqueo['intentos_fallidos'] >= $maxIntentos) {
+        $model->reiniciarIntentos((int)$bloqueo['id']);
+        $bloqueo['intentos_fallidos'] = 0;
+    }
+}
+
 $user = $model->validarCredenciales($email, $password);
 
 if ($user !== null) {
+    // Exito: el contador y el bloqueo se reinician (intentos consecutivos).
+    $model->reiniciarIntentos((int)$user['id']);
     session_regenerate_id(true);
     $_SESSION['usuario_id'] = (int)$user['id'];
     $_SESSION['nombre'] = (string)$user['nombre'];
     $_SESSION['email'] = (string)$user['email'];
     header('Location: /dashboard');
     exit;
+}
+
+// 2) Fallo: si el email corresponde a una cuenta, sumar intento y bloquear al llegar al maximo.
+if ($bloqueo !== null) {
+    $nuevosIntentos = (int)$bloqueo['intentos_fallidos'] + 1;
+    $model->incrementarIntentos((int)$bloqueo['id']);
+    if ($nuevosIntentos >= $maxIntentos) {
+        $model->establecerBloqueo((int)$bloqueo['id'], $minutosBloqueo);
+        $_SESSION['login_error'] = 'Cuenta bloqueada por demasiados intentos fallidos. Probá de nuevo en ' . $minutosBloqueo . ' min.';
+        header('Location: ../views/auth/login.php');
+        exit;
+    }
 }
 
 $_SESSION['login_error'] = 'Credenciales inválidas';
