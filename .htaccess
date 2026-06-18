@@ -32,7 +32,7 @@ RewriteRule ^(config|models|includes|logs)(/|$) - [F,L]
 # del gate de auth). Las vistas se renderizan via include desde index.php,
 # nunca por peticion directa. Excepcion: la pantalla de login, que SI se
 # sirve directa (el gate redirige a ella).
-RewriteRule ^views/auth/login\.php$ - [L]
+RewriteRule ^views/auth/(login|recuperar|restablecer)\.php$ - [L]
 RewriteRule ^views/ - [F,L]
 
 # Front controller: toda peticion que NO sea archivo o directorio real

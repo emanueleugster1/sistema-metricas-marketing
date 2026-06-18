@@ -17,7 +17,11 @@ CREATE TABLE usuarios (
     password_hash VARCHAR(255) NOT NULL,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    activo BOOLEAN DEFAULT TRUE
+    activo BOOLEAN DEFAULT TRUE,
+    token_recuperacion VARCHAR(64) NULL,
+    fecha_expiracion_token DATETIME NULL,
+    intentos_fallidos INT NOT NULL DEFAULT 0,
+    bloqueada_hasta DATETIME NULL
 );
 
 -- Tabla plataformas
@@ -132,6 +136,7 @@ CREATE TABLE dashboard_widgets (
 
 -- Crear Ã­ndices adicionales para optimizaciÃ³n de consultas
 CREATE INDEX idx_usuarios_email ON usuarios(email);
+CREATE INDEX idx_usuarios_token_recuperacion ON usuarios(token_recuperacion);
 CREATE INDEX idx_usuarios_activo ON usuarios(activo);
 CREATE INDEX idx_clientes_usuario ON clientes(usuario_id);
 CREATE INDEX idx_clientes_activo ON clientes(activo);

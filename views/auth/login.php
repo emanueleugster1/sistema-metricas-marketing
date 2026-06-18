@@ -7,6 +7,8 @@ if (isset($_SESSION['usuario_id'])) {
 }
 $error = isset($_SESSION['login_error']) ? (string)$_SESSION['login_error'] : '';
 if ($error !== '') { unset($_SESSION['login_error']); }
+$info = isset($_SESSION['login_info']) ? (string)$_SESSION['login_info'] : '';
+if ($info !== '') { unset($_SESSION['login_info']); }
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -27,6 +29,9 @@ if ($error !== '') { unset($_SESSION['login_error']); }
       </div>
       <p class="login-tagline">Panel de agencia de marketing</p>
 
+      <?php if ($info !== ''): ?>
+        <div class="login-info-msg"><i class="bi bi-check-circle"></i> <?= htmlspecialchars($info, ENT_QUOTES, 'UTF-8'); ?></div>
+      <?php endif; ?>
       <?php if ($error !== ''): ?>
         <div class="login-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
       <?php endif; ?>
@@ -42,6 +47,7 @@ if ($error !== '') { unset($_SESSION['login_error']); }
         </div>
         <button type="submit" class="login-button">Iniciar sesión</button>
       </form>
+      <a class="login-back" href="/views/auth/recuperar.php">¿Olvidaste tu contraseña?</a>
     </div>
     <p class="login-footnote">Sistema de centralización de métricas</p>
   </main>

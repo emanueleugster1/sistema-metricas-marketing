@@ -56,5 +56,83 @@ class UsuarioModel
         $rows = $stmt->fetchAll();
         return is_array($rows) ? $rows : [];
     }
+
+    /**
+     * Guarda el token de recuperacion (hasheado) y su expiracion para un usuario activo.
+     */
+    public function guardarTokenRecuperacion(int $usuarioId, string $tokenHash, string $fechaExpiracion): bool
+    {
+        $sql = 'UPDATE usuarios SET token_recuperacion = ?, fecha_expiracion_token = ? WHERE id = ? AND activo = 1';
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$tokenHash, $fechaExpiracion, $usuarioId]);
+    }
+
+    /**
+     * Devuelve el usuario asociado a un token de recuperacion vigente (no expirado), o null.
+     */
+    public function obtenerPorTokenRecuperacion(string $tokenHash): ?array
+    {
+        $sql = 'SELECT id, nombre, email, activo FROM usuarios WHERE token_recuperacion = ? AND fecha_expiracion_token > NOW() AND activo = 1 LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$tokenHash]);
+        $row = $stmt->fetch();
+        return $row !== false ? $row : null;
+    }
+
+    /**
+     * Cambia la contrasena y anula el token de recuperacion (uso unico).
+     */
+    public function actualizarPassword(int $usuarioId, string $passwordHash): bool
+    {
+        $sql = 'UPDATE usuarios SET password_hash = ?, token_recuperacion = NULL, fecha_expiracion_token = NULL, fecha_actualizacion = NOW() WHERE id = ?';
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$passwordHash, $usuarioId]);
+    }
+
+    /**
+     * Estado de bloqueo por intentos fallidos de una cuenta (o null si el email
+     * no existe). Lo usa el login para decidir antes de verificar la contrasena.
+     */
+    public function obtenerBloqueoPorEmail(string $email): ?array
+    {
+        // El tiempo restante de bloqueo se calcula con el reloj de la BD (NOW())
+        // para evitar desfases de zona horaria entre PHP y MySQL/MariaDB.
+        $sql = 'SELECT id, intentos_fallidos,
+                       CASE WHEN bloqueada_hasta IS NULL THEN 0
+                            ELSE GREATEST(0, TIMESTAMPDIFF(SECOND, NOW(), bloqueada_hasta)) END AS bloqueo_restante_seg
+                FROM usuarios WHERE email = ? LIMIT 1';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$email]);
+        $row = $stmt->fetch();
+        return $row !== false ? $row : null;
+    }
+
+    /** Suma 1 al contador de intentos fallidos. */
+    public function incrementarIntentos(int $usuarioId): bool
+    {
+        $sql = 'UPDATE usuarios SET intentos_fallidos = intentos_fallidos + 1 WHERE id = ?';
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$usuarioId]);
+    }
+
+    /**
+     * Bloquea la cuenta por la cantidad de minutos indicada, calculando la
+     * fecha con el reloj de la BD (NOW()) para ser consistente con la
+     * comparacion de bloqueo y evitar desfases de zona horaria con PHP.
+     */
+    public function establecerBloqueo(int $usuarioId, int $minutos): bool
+    {
+        $sql = 'UPDATE usuarios SET bloqueada_hasta = (NOW() + INTERVAL ? MINUTE) WHERE id = ?';
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$minutos, $usuarioId]);
+    }
+
+    /** Reinicia el contador y quita el bloqueo (login exitoso o bloqueo vencido). */
+    public function reiniciarIntentos(int $usuarioId): bool
+    {
+        $sql = 'UPDATE usuarios SET intentos_fallidos = 0, bloqueada_hasta = NULL WHERE id = ?';
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute([$usuarioId]);
+    }
 }
 
