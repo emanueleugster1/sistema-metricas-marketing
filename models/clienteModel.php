@@ -38,6 +38,49 @@ class ClienteModel
         return is_array($rows) ? $rows : [];
     }
 
+    /**
+     * Listado enriquecido para la grilla de clientes. Agrega por cliente:
+     * cantidad de plataformas conectadas, sus nombres, si tiene dashboard
+     * configurado y la fecha del ultimo dato de metricas.
+     * Usa COUNT(DISTINCT)/MAX para ser robusto al cruce de los LEFT JOIN.
+     */
+    public function listarTodosEnriquecido(int $usuarioId, ?string $q = null, int $limit = 50, int $offset = 0): array
+    {
+        $where = 'WHERE c.usuario_id = ?';
+        $params = [[$usuarioId, PDO::PARAM_INT]];
+        if ($q !== null && $q !== '') {
+            $where .= ' AND c.nombre LIKE ?';
+            $params[] = ['%' . $q . '%', PDO::PARAM_STR];
+        }
+
+        $sql = 'SELECT
+                    c.id, c.nombre, c.sector, c.activo, c.fecha_creacion,
+                    COUNT(DISTINCT cp.plataforma_id) AS plataformas_conectadas,
+                    GROUP_CONCAT(DISTINCT p.nombre ORDER BY p.nombre SEPARATOR ",") AS plataformas_nombres,
+                    CASE WHEN COUNT(DISTINCT d.id) > 0 THEN 1 ELSE 0 END AS tiene_dashboard,
+                    MAX(m.fecha_metrica) AS ultima_metrica
+                FROM clientes c
+                LEFT JOIN credenciales_plataforma cp ON cp.cliente_id = c.id
+                LEFT JOIN plataformas p ON p.id = cp.plataforma_id
+                LEFT JOIN dashboards d ON d.cliente_id = c.id
+                LEFT JOIN metricas m ON m.cliente_id = c.id
+                ' . $where . '
+                GROUP BY c.id, c.nombre, c.sector, c.activo, c.fecha_creacion
+                ORDER BY c.activo DESC, c.nombre ASC
+                LIMIT ? OFFSET ?';
+
+        $stmt = $this->db->prepare($sql);
+        $i = 1;
+        foreach ($params as [$value, $type]) {
+            $stmt->bindValue($i++, $value, $type);
+        }
+        $stmt->bindValue($i++, $limit, PDO::PARAM_INT);
+        $stmt->bindValue($i++, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll();
+        return is_array($rows) ? $rows : [];
+    }
+
     public function obtenerPorId(int $id, ?int $usuarioId = null): ?array
     {
         if ($usuarioId !== null) {
@@ -140,6 +183,23 @@ class ClienteModel
         foreach ($rows as $r) {
             $decoded = json_decode((string)$r['credenciales'], true);
             $result[(int)$r['plataforma_id']] = is_array($decoded) ? $decoded : [];
+        }
+        return $result;
+    }
+
+    /**
+     * Estado de validacion por plataforma de un cliente: [plataforma_id => bool].
+     * Lee la columna existente credenciales_plataforma.validada.
+     */
+    public function obtenerValidadasPorCliente(int $clienteId): array
+    {
+        $sql = 'SELECT plataforma_id, validada FROM credenciales_plataforma WHERE cliente_id = ?';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId]);
+        $rows = $stmt->fetchAll();
+        $result = [];
+        foreach ($rows as $r) {
+            $result[(int)$r['plataforma_id']] = (int)$r['validada'] === 1;
         }
         return $result;
     }

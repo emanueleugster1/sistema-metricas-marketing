@@ -7,6 +7,13 @@ require_once __DIR__ . '/../models/dashboardModel.php';
 require_once __DIR__ . '/dashboardController.php';
 require_once __DIR__ . '/../api/connectors/metaConnector.php';
 
+/** Devuelve la fecha del ultimo dato de metricas del cliente (solo lectura). */
+function MetricaController_ultima_fecha(int $clienteId): ?string
+{
+    $model = new MetricaModel();
+    return $model->obtenerUltimaFecha($clienteId);
+}
+
 function MetricaController_resumen(int $clienteId, int $usuarioId): array
 {
     $model = new MetricaModel();

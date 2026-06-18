@@ -5,30 +5,43 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 $currentPath = (string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $isInicio = $currentPath === '/' || str_starts_with($currentPath, '/dashboard');
 $isClientes = str_starts_with($currentPath, '/clientes');
+$nombreUsuario = isset($_SESSION['nombre']) ? (string)$_SESSION['nombre'] : 'Usuario';
+$inicialUsuario = strtoupper(mb_substr($nombreUsuario, 0, 1, 'UTF-8'));
 ?>
-<aside class="sidebar" role="navigation" aria-label="Menú principal">
-  <div class="sidebar-inner">
+<aside class="sidebar">
+  <a class="sidebar-brand" href="/dashboard">
+    <span class="sidebar-brand-icon"><i class="bi bi-bar-chart-fill"></i></span>
+    <span class="sidebar-brand-text">
+      <strong>Métricas</strong>
+      <small>Panel de agencia</small>
+    </span>
+  </a>
+
+  <nav class="sidebar-nav" aria-label="Menú principal">
     <ul class="sidebar-menu">
-      <li class="sidebar-item">
+      <li>
         <a class="sidebar-link<?= $isInicio ? ' active' : '' ?>" href="/dashboard">
-          <span class="sidebar-icon"><i class="bi bi-house-fill"></i></span>
-          <span class="sidebar-text">Inicio</span>
+          <i class="bi bi-house-door"></i><span>Inicio</span>
         </a>
       </li>
-      <li class="sidebar-item">
+      <li>
         <a class="sidebar-link<?= $isClientes ? ' active' : '' ?>" href="/clientes/lista">
-          <span class="sidebar-icon"><i class="bi bi-person-fill"></i></span>
-          <span class="sidebar-text">Clientes</span>
-        </a>
-      </li>
-      <li class="sidebar-item">
-        <a class="sidebar-link" href="../controllers/authController.php?action=logout">
-          <span class="sidebar-icon"><i class="bi bi-box-arrow-right"></i></span>
-          <span class="sidebar-text">Cerra sesión</span>
+          <i class="bi bi-people"></i><span>Clientes</span>
         </a>
       </li>
     </ul>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <span class="user-avatar"><?= htmlspecialchars($inicialUsuario, ENT_QUOTES, 'UTF-8') ?></span>
+      <span class="sidebar-user-info">
+        <strong><?= htmlspecialchars($nombreUsuario, ENT_QUOTES, 'UTF-8') ?></strong>
+        <small>Agencia</small>
+      </span>
+    </div>
+    <a class="sidebar-logout" href="/controllers/authController.php?action=logout">
+      <i class="bi bi-box-arrow-right"></i><span>Cerrar sesión</span>
+    </a>
   </div>
-  <!-- Estilos via assets/css en vistas que incluyan este template -->
 </aside>
-<script src="../../assets/js/templates/sidebar.js"></script>

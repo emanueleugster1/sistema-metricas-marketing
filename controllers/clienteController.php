@@ -11,6 +11,12 @@ function ClienteController_listar(int $usuarioId, ?string $q = null, int $limit 
     return $model->listarTodos($limit, $offset, $usuarioId, $q);
 }
 
+function ClienteController_listarEnriquecido(int $usuarioId, ?string $q = null, int $limit = 50, int $offset = 0): array
+{
+    $model = new ClienteModel();
+    return $model->listarTodosEnriquecido($usuarioId, $q, $limit, $offset);
+}
+
 function ClienteController_obtener(int $id, int $usuarioId): ?array
 {
     $model = new ClienteModel();
@@ -33,6 +39,12 @@ function ClienteController_cliente_credenciales(int $cid): array
 {
     $model = new ClienteModel();
     return $model->obtenerCredencialesPorCliente($cid);
+}
+
+function ClienteController_estado_credenciales(int $cid): array
+{
+    $model = new ClienteModel();
+    return $model->obtenerValidadasPorCliente($cid);
 }
 
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((string)$_SERVER['SCRIPT_FILENAME'])) {

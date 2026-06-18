@@ -1,10 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // El id viene en el path de la URL limpia (/clientes/metricas/{id});
+    // se conserva el query string como respaldo por compatibilidad.
     const params = new URLSearchParams(window.location.search);
-    const clienteId = params.get('cliente_id');
+    const pathMatch = window.location.pathname.match(/\/clientes\/metricas\/(\d+)/);
+    const clienteId = (pathMatch && pathMatch[1]) || params.get('cliente_id');
     const dias = 30;
 
     if (clienteId) {
-        fetch(`controllers/metricaController.php?action=widgets_data&cliente_id=${clienteId}&dias=${dias}`)
+        fetch(`/controllers/metricaController.php?action=widgets_data&cliente_id=${clienteId}&dias=${dias}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {

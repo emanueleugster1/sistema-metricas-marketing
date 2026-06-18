@@ -57,6 +57,17 @@ final class MetricaModel
         return $stmt->fetchAll() ?: [];
     }
 
+    /** Fecha del ultimo dato de metricas del cliente (o null si no hay). */
+    public function obtenerUltimaFecha(int $clienteId): ?string
+    {
+        $sql = 'SELECT MAX(fecha_metrica) AS ultima FROM metricas WHERE cliente_id = ?';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$clienteId]);
+        $row = $stmt->fetch();
+        $val = $row['ultima'] ?? null;
+        return $val !== null ? (string)$val : null;
+    }
+
     public function hayMetricasRecientes(int $clienteId, int $dias = 7): bool
     {
         $dias = max(1, $dias);

@@ -125,6 +125,25 @@ function format_value($val, string $metric, string $currency): string {
 }
 
  
+// --- Datos de cabecera (presentacion): estado de conexion y ultimo dato ---
+$breadcrumb = ['Clientes', 'Métricas'];
+$metaConectada = false;
+foreach ($plataformasCliente as $pl) {
+    if ((int)($pl['plataforma_id'] ?? 0) === 5) { $metaConectada = true; break; }
+}
+$ultimaFecha = MetricaController_ultima_fecha($clienteId);
+
+function metricas_rel(?string $fecha): string {
+    if ($fecha === null || $fecha === '') { return '—'; }
+    $ts = strtotime($fecha);
+    if ($ts === false) { return '—'; }
+    $dias = (int) floor((time() - $ts) / 86400);
+    if ($dias <= 0) { return 'hoy'; }
+    if ($dias === 1) { return 'ayer'; }
+    if ($dias < 30) { return 'hace ' . $dias . ' d'; }
+    $meses = (int) floor($dias / 30);
+    return $meses === 1 ? 'hace 1 mes' : 'hace ' . $meses . ' meses';
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -133,40 +152,44 @@ function format_value($val, string $metric, string $currency): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Métricas</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="../../assets/css/global.css">
+  <link rel="stylesheet" href="../../assets/css/components.css">
   <link rel="stylesheet" href="../../assets/css/templates/sidebar.css">
   <link rel="stylesheet" href="../../assets/css/templates/buttons.css">
   <link rel="stylesheet" href="../../assets/css/clientes/metricas.css">
 </head>
 <body>
   <?php require_once __DIR__ . '/../templates/sidebar.php'; ?>
-  <main class="content-with-sidebar metricas-content" id="metricas-root"
+  <div class="app-main">
+    <?php require __DIR__ . '/../templates/topbar.php'; ?>
+    <main class="app-content metricas-content" id="metricas-root"
         data-ads='<?= htmlspecialchars(json_encode($adsData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'
         data-page='<?= htmlspecialchars(json_encode($pageInsights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'
         data-ig='<?= htmlspecialchars(json_encode($igInsights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'
         data-prev='<?= htmlspecialchars(json_encode($prevVals, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'>
-    <div class="header-row">
+    <header class="page-header">
       <div>
-        <div class="title"><?= $cliente ? htmlspecialchars((string)$cliente['nombre'], ENT_QUOTES, 'UTF-8') : 'Cliente' ?><?= $cliente && $cliente['sector'] ? ' - ' . htmlspecialchars((string)$cliente['sector'], ENT_QUOTES, 'UTF-8') : '' ?></div>
+        <h1><?= $cliente ? htmlspecialchars((string)$cliente['nombre'], ENT_QUOTES, 'UTF-8') : 'Cliente' ?></h1>
+        <p class="page-subtitle">
+          <?php if ($cliente && $cliente['sector']): ?><?= htmlspecialchars((string)$cliente['sector'], ENT_QUOTES, 'UTF-8') ?> · <?php endif; ?>
+          <?php if ($metaConectada): ?>
+            <span class="status status-active">Meta conectada</span>
+          <?php else: ?>
+            <span class="status status-inactive">Sin conexión</span>
+          <?php endif; ?>
+          <?php if ($ultimaFecha): ?> · último dato <?= htmlspecialchars(metricas_rel($ultimaFecha), ENT_QUOTES, 'UTF-8') ?><?php endif; ?>
+        </p>
       </div>
-      <a class="btn btn-secondary" href="/clientes/lista">Atrás</a>
-    </div>
-    <div class="page-card">
-
-    <div class="toolbar">
-      <?php if ($tieneDashboard): ?>
-        <button type="button" id="personalizar-dashboard-btn" class="btn btn-outline-primary no-global-loading">
-            <i class="bi bi-gear"></i> Personalizar Dashboard
-        </button>
-      <?php else: ?>
-        <button type="button" id="crear-dashboard-btn" class="btn btn-primary no-global-loading">
-            <i class="bi bi-pencil-fill"></i> Crear Dashboard
-        </button>
-      <?php endif; ?>
-      
-      <select class="select-lite decoration">
-          <option selected>30 días</option>
-      </select>
-    </div>
+      <div class="page-header-actions">
+        <?php if ($tieneDashboard): ?>
+          <span class="badge badge-muted">Últimos 30 días</span>
+          <button type="button" id="personalizar-dashboard-btn" class="btn btn-secondary no-global-loading">
+            <i class="bi bi-gear"></i> Personalizar
+          </button>
+        <?php endif; ?>
+        <a class="btn btn-secondary" href="/clientes/lista"><i class="bi bi-arrow-left"></i> Volver</a>
+      </div>
+    </header>
 
     <?php if ($tieneDashboard): ?>
       <div class="cards">
@@ -226,26 +249,26 @@ function format_value($val, string $metric, string $currency): string {
         <?php endforeach; ?>
       </div>
     <?php else: ?>
-      <div class="empty-state" style="text-align: center; padding: var(--spacing-2xl); background: var(--color-gray-100); border-radius: var(--border-radius-lg); margin-top: var(--spacing-lg);">
-          <div style="font-size: var(--font-size-3xl); color: var(--color-gray-300); margin-bottom: var(--spacing-md);">
-              <i class="bi bi-bar-chart-line"></i>
-          </div>
-          <p style="color: var(--color-secondary); margin-bottom: var(--spacing-lg);">No hay un dashboard configurado para este cliente.</p>
-          <button type="button" onclick="document.getElementById('crear-dashboard-btn').click()" class="btn btn-primary no-global-loading">
-              Comenzar ahora
+      <div class="empty-state">
+          <i class="bi bi-bar-chart-line empty-icon"></i>
+          <p>No hay un dashboard configurado para este cliente.</p>
+          <button type="button" id="crear-dashboard-btn" class="btn btn-primary no-global-loading">
+              <i class="bi bi-plus-lg"></i> Crear dashboard
           </button>
       </div>
     <?php endif; ?>
 
-  <section class="recom-block">
-    <div class="recom-title" style="margin-top: var(--spacing-md);">Recomendaciones</div>
+  <section class="panel recom-panel">
+    <div class="panel-header">
+      <h2 class="panel-title"><i class="bi bi-stars"></i> Análisis y recomendaciones</h2>
+    </div>
     <?php $ultimaRec = is_array($dashData) ? ($dashData['ultima_recomendacion_ml'] ?? null) : null; $recomContent = $ultimaRec ? (string)($ultimaRec['contenido'] ?? '') : $recomMl; ?>
-    <div class="recom-card"><?php 
-    if ($recomContent !== '') { 
-        echo nl2br($recomContent); 
-    } else { 
-        echo 'Sin datos suficientes'; 
-    } 
+    <div class="panel-body recom-body"><?php
+    if ($recomContent !== '') {
+        echo nl2br(htmlspecialchars($recomContent, ENT_QUOTES, 'UTF-8'));
+    } else {
+        echo '<span class="cell-empty">Sin datos suficientes</span>';
+    }
 ?></div>
   </section>
     
@@ -274,8 +297,8 @@ function format_value($val, string $metric, string $currency): string {
         require __DIR__ . '/../../views/templates/dashboard_form.php';
     ?>
 
-    </div>
   </main>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="../../assets/js/clientes/metricas.js"></script>
