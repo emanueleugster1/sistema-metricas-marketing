@@ -12,13 +12,13 @@ class ClienteModel
         $this->db = Database::getInstance()->getConnection();
     }
 
-    public function listarTodos(int $limit = 50, int $offset = 0, ?int $usuarioId = null, ?string $q = null): array
+    public function listarTodos(int $limit = 50, int $offset = 0, ?int $agenciaId = null, ?string $q = null): array
     {
         $params = [];
         $where = 'WHERE 1 = 1';
-        if ($usuarioId !== null) {
-            $where .= ' AND usuario_id = ?';
-            $params[] = [$usuarioId, PDO::PARAM_INT];
+        if ($agenciaId !== null) {
+            $where .= ' AND agencia_id = ?';
+            $params[] = [$agenciaId, PDO::PARAM_INT];
         }
         if ($q !== null && $q !== '') {
             $where .= ' AND nombre LIKE ?';
@@ -44,10 +44,10 @@ class ClienteModel
      * configurado y la fecha del ultimo dato de metricas.
      * Usa COUNT(DISTINCT)/MAX para ser robusto al cruce de los LEFT JOIN.
      */
-    public function listarTodosEnriquecido(int $usuarioId, ?string $q = null, int $limit = 50, int $offset = 0): array
+    public function listarTodosEnriquecido(int $agenciaId, ?string $q = null, int $limit = 50, int $offset = 0): array
     {
-        $where = 'WHERE c.usuario_id = ?';
-        $params = [[$usuarioId, PDO::PARAM_INT]];
+        $where = 'WHERE c.agencia_id = ?';
+        $params = [[$agenciaId, PDO::PARAM_INT]];
         if ($q !== null && $q !== '') {
             $where .= ' AND c.nombre LIKE ?';
             $params[] = ['%' . $q . '%', PDO::PARAM_STR];
@@ -81,12 +81,12 @@ class ClienteModel
         return is_array($rows) ? $rows : [];
     }
 
-    public function obtenerPorId(int $id, ?int $usuarioId = null): ?array
+    public function obtenerPorId(int $id, ?int $agenciaId = null): ?array
     {
-        if ($usuarioId !== null) {
-            $sql = 'SELECT * FROM clientes WHERE id = ? AND usuario_id = ? LIMIT 1';
+        if ($agenciaId !== null) {
+            $sql = 'SELECT * FROM clientes WHERE id = ? AND agencia_id = ? LIMIT 1';
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([$id, $usuarioId]);
+            $stmt->execute([$id, $agenciaId]);
         } else {
             $sql = 'SELECT * FROM clientes WHERE id = ? LIMIT 1';
             $stmt = $this->db->prepare($sql);
@@ -96,25 +96,26 @@ class ClienteModel
         return $row !== false ? $row : null;
     }
 
-    public function crear(int $usuarioId, string $nombre, ?string $sector, bool $activo = true): bool
+    public function crear(int $usuarioId, int $agenciaId, string $nombre, ?string $sector, bool $activo = true): bool
     {
-        $sql = 'INSERT INTO clientes (usuario_id, nombre, sector, activo, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, ?, NOW(), NOW())';
+        // usuario_id queda como creador; la pertenencia es por agencia_id.
+        $sql = 'INSERT INTO clientes (usuario_id, agencia_id, nombre, sector, activo, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, ?, ?, NOW(), NOW())';
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$usuarioId, $nombre, $sector, $activo ? 1 : 0]);
+        return $stmt->execute([$usuarioId, $agenciaId, $nombre, $sector, $activo ? 1 : 0]);
     }
 
-    public function actualizar(int $id, int $usuarioId, string $nombre, ?string $sector, bool $activo): bool
+    public function actualizar(int $id, int $agenciaId, string $nombre, ?string $sector, bool $activo): bool
     {
-        $sql = 'UPDATE clientes SET nombre = ?, sector = ?, activo = ?, fecha_actualizacion = NOW() WHERE id = ? AND usuario_id = ?';
+        $sql = 'UPDATE clientes SET nombre = ?, sector = ?, activo = ?, fecha_actualizacion = NOW() WHERE id = ? AND agencia_id = ?';
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$nombre, $sector, $activo ? 1 : 0, $id, $usuarioId]);
+        return $stmt->execute([$nombre, $sector, $activo ? 1 : 0, $id, $agenciaId]);
     }
 
-    public function eliminar(int $id, int $usuarioId): bool
+    public function eliminar(int $id, int $agenciaId): bool
     {
-        $sql = 'DELETE FROM clientes WHERE id = ? AND usuario_id = ?';
+        $sql = 'DELETE FROM clientes WHERE id = ? AND agencia_id = ?';
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$id, $usuarioId]);
+        return $stmt->execute([$id, $agenciaId]);
     }
 
     public function obtenerPlataformasActivas(): array
@@ -134,13 +135,14 @@ class ClienteModel
         return is_array($rows) ? $rows : [];
     }
 
-    public function crearClienteConCredenciales(int $usuarioId, string $nombre, ?string $sector, bool $activo, array $credencialesPorPlataforma): bool
+    public function crearClienteConCredenciales(int $usuarioId, int $agenciaId, string $nombre, ?string $sector, bool $activo, array $credencialesPorPlataforma): bool
     {
         $this->db->beginTransaction();
         try {
-            $sqlCliente = 'INSERT INTO clientes (usuario_id, nombre, sector, activo, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, ?, NOW(), NOW())';
+            // usuario_id queda como creador; la pertenencia es por agencia_id.
+            $sqlCliente = 'INSERT INTO clientes (usuario_id, agencia_id, nombre, sector, activo, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, ?, ?, NOW(), NOW())';
             $stmtCliente = $this->db->prepare($sqlCliente);
-            $okCliente = $stmtCliente->execute([$usuarioId, $nombre, $sector, $activo ? 1 : 0]);
+            $okCliente = $stmtCliente->execute([$usuarioId, $agenciaId, $nombre, $sector, $activo ? 1 : 0]);
             if (!$okCliente) {
                 $this->db->rollBack();
                 return false;
@@ -204,13 +206,13 @@ class ClienteModel
         return $result;
     }
 
-    public function actualizarClienteConCredenciales(int $clienteId, int $usuarioId, string $nombre, ?string $sector, bool $activo, array $credencialesPorPlataforma): bool
+    public function actualizarClienteConCredenciales(int $clienteId, int $agenciaId, string $nombre, ?string $sector, bool $activo, array $credencialesPorPlataforma): bool
     {
         $this->db->beginTransaction();
         try {
-            $sqlUpd = 'UPDATE clientes SET nombre = ?, sector = ?, activo = ?, fecha_actualizacion = NOW() WHERE id = ? AND usuario_id = ?';
+            $sqlUpd = 'UPDATE clientes SET nombre = ?, sector = ?, activo = ?, fecha_actualizacion = NOW() WHERE id = ? AND agencia_id = ?';
             $stmtUpd = $this->db->prepare($sqlUpd);
-            $okUpd = $stmtUpd->execute([$nombre, $sector, $activo ? 1 : 0, $clienteId, $usuarioId]);
+            $okUpd = $stmtUpd->execute([$nombre, $sector, $activo ? 1 : 0, $clienteId, $agenciaId]);
             if (!$okUpd) {
                 $this->db->rollBack();
                 return false;

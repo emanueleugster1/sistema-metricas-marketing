@@ -25,20 +25,20 @@ function DashboardController_buildRecommendations(array $rows, array $featureKey
     return ['ml' => (string)$mlText, 'ai_ml' => (string)$aiMl];
 }
 
-function DashboardController_actualizarWidgets(int $dashboardId, array $widgetsIds, int $usuarioId): array
+function DashboardController_actualizarWidgets(int $dashboardId, array $widgetsIds, int $agenciaId): array
 {
     $model = new DashboardModel();
-    
+
     // Verificar que el dashboard existe
     $dashboard = $model->obtenerDashboardPorId($dashboardId);
     if (!$dashboard) {
         return ['success' => false, 'error' => 'dashboard_no_encontrado'];
     }
-    
-    // Verificar que el cliente del dashboard pertenece al usuario autenticado
+
+    // Verificar que el cliente del dashboard pertenece a la agencia del usuario
     $metricaModel = new MetricaModel();
     $cliente = $metricaModel->obtenerClientePorId((int)$dashboard['cliente_id']);
-    if (!$cliente || (int)$cliente['usuario_id'] !== $usuarioId) {
+    if (!$cliente || (int)$cliente['agencia_id'] !== $agenciaId) {
         return ['success' => false, 'error' => 'acceso_denegado'];
     }
     
@@ -50,11 +50,11 @@ function DashboardController_actualizarWidgets(int $dashboardId, array $widgetsI
         : ['success' => false, 'error' => 'error_al_actualizar_widgets'];
 }
 
-function DashboardController_extraerYGuardarTodas(int $clienteId, int $usuarioId): array
+function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId): array
 {
     $mm = new MetricaModel();
     $cliente = $mm->obtenerClientePorId($clienteId);
-    if ($cliente === null || (int)$cliente['usuario_id'] !== $usuarioId) {
+    if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
         return ['success' => false, 'inserted' => 0];
     }
     $model = new DashboardModel();
@@ -169,12 +169,12 @@ function DashboardController_widgetsDisponibles(int $plataformaId): array
     return $allowed;
 }
 
-function DashboardController_resumen(int $clienteId, int $usuarioId): array
+function DashboardController_resumen(int $clienteId, int $agenciaId): array
 {
     $model = new DashboardModel();
     $clienteModel = new MetricaModel();
     $cliente = $clienteModel->obtenerClientePorId($clienteId);
-    if ($cliente === null || (int)$cliente['usuario_id'] !== $usuarioId) {
+    if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
         return ['success' => false, 'error' => 'not_found_or_forbidden'];
     }
     $dashboard = $model->obtenerDashboardPorCliente($clienteId);
@@ -229,7 +229,7 @@ function DashboardController_resumen(int $clienteId, int $usuarioId): array
                 $api_errors = [];
                 $fresh = $clienteModel->hayMetricasRecientes($clienteId, 7);
                 if (!$fresh) {
-                    DashboardController_extraerYGuardarTodas($clienteId, $usuarioId);
+                    DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
                 }
                 $values = [];
                 if ($adAccountId !== '') {
@@ -369,7 +369,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         exit;
     }
 
-    $usuarioId = (int)$_SESSION['usuario_id'];
+    $agenciaId = (int)($_SESSION['agencia_id'] ?? 0);
 
     if ($method === 'GET' && $action === 'resumen') {
         header('Content-Type: application/json');
@@ -379,7 +379,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             exit;
         }
 
-        $data = DashboardController_resumen($clienteId, $usuarioId);
+        $data = DashboardController_resumen($clienteId, $agenciaId);
         echo json_encode($data);
         exit;
     }
@@ -444,7 +444,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             }
         }
         
-        $resultado = DashboardController_actualizarWidgets($dashboardId, $widgetsIds, $usuarioId);
+        $resultado = DashboardController_actualizarWidgets($dashboardId, $widgetsIds, $agenciaId);
         echo json_encode($resultado);
         exit;
     }
@@ -456,7 +456,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
             exit;
         }
-        $res = DashboardController_extraerYGuardarTodas($clienteId, $usuarioId);
+        $res = DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
         $mm = new MetricaModel();
         $model = new DashboardModel();
         $dashboard = $model->obtenerDashboardPorCliente($clienteId);

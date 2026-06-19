@@ -61,6 +61,9 @@ $routes = [
     ['GET', '#^/clientes/create/?$#',         'clientes/create.php',   []],
     ['GET', '#^/clientes/editar/(\d+)/?$#',   'clientes/editar.php',   ['cliente_id']],
     ['GET', '#^/clientes/metricas/(\d+)/?$#', 'clientes/metricas.php', ['cliente_id']],
+    ['GET', '#^/usuarios/lista/?$#',          'usuarios/lista.php',    []],
+    ['GET', '#^/usuarios/create/?$#',         'usuarios/create.php',   []],
+    ['GET', '#^/usuarios/editar/(\d+)/?$#',   'usuarios/editar.php',   ['id']],
 ];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

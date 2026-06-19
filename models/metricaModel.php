@@ -14,7 +14,7 @@ final class MetricaModel
 
     public function obtenerClientePorId(int $clienteId): ?array
     {
-        $sql = 'SELECT id, usuario_id, nombre, sector, activo FROM clientes WHERE id = ? LIMIT 1';
+        $sql = 'SELECT id, usuario_id, agencia_id, nombre, sector, activo FROM clientes WHERE id = ? LIMIT 1';
         $stmt = $this->db->prepare($sql);
         $stmt->execute([$clienteId]);
         $row = $stmt->fetch();

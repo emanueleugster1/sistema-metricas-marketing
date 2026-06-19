@@ -18,11 +18,13 @@ try {
         echo "El usuario ya existe: " . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . "<br>";
     } else {
         $hash = password_hash($password, PASSWORD_DEFAULT);
-        $stmt = $pdo->prepare('INSERT INTO usuarios (nombre, email, password_hash) VALUES (:nombre, :email, :password_hash)');
+        // El usuario inicial es administrador de la agencia principal.
+        $stmt = $pdo->prepare('INSERT INTO usuarios (nombre, email, password_hash, rol_id, agencia_id) VALUES (:nombre, :email, :password_hash, (SELECT id FROM roles WHERE nombre = :rol), (SELECT MIN(id) FROM agencias))');
         $ok = $stmt->execute([
             ':nombre' => $nombre,
             ':email' => $email,
             ':password_hash' => $hash,
+            ':rol' => 'administrador',
         ]);
         if ($ok) {
             echo "Usuario de prueba creado con éxito. ID: " . htmlspecialchars($pdo->lastInsertId(), ENT_QUOTES, 'UTF-8') . "<br>";

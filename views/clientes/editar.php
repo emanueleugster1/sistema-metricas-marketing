@@ -3,13 +3,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 require_once __DIR__ . '/../../controllers/clienteController.php';
-$usuarioId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : null;
+$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
 $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
 $error = isset($_GET['error']) ? (string)$_GET['error'] : null;
 $errorMsg = null;
 if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Verifique nombre y credenciales.'; }
 if ($error === 'not_found') { $errorMsg = 'Cliente no encontrado o sin permiso.'; }
-$cliente = $clienteId > 0 ? (ClienteController_obtener($clienteId, $usuarioId) ?? []) : [];
+$cliente = $clienteId > 0 ? (ClienteController_obtener($clienteId, $agenciaId) ?? []) : [];
 $plataformas = ClienteController_plataformas();
 $camposPorPlataforma = [];
 foreach ($plataformas as $p) {

@@ -14,11 +14,11 @@ function MetricaController_ultima_fecha(int $clienteId): ?string
     return $model->obtenerUltimaFecha($clienteId);
 }
 
-function MetricaController_resumen(int $clienteId, int $usuarioId): array
+function MetricaController_resumen(int $clienteId, int $agenciaId): array
 {
     $model = new MetricaModel();
     $cliente = $model->obtenerClientePorId($clienteId);
-    if ($cliente === null || (int)$cliente['usuario_id'] !== $usuarioId) {
+    if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
         return ['success' => false, 'error' => 'not_found_or_forbidden'];
     }
     $errores = [];
@@ -94,7 +94,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
     }
 
     $model = new MetricaModel();
-    $usuarioId = (int)$_SESSION['usuario_id'];
+    $agenciaId = (int)($_SESSION['agencia_id'] ?? 0);
 
     if ($method === 'GET' && $action === 'resumen') {
         header('Content-Type: application/json');
@@ -104,7 +104,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             exit;
         }
 
-        $data = MetricaController_resumen($clienteId, $usuarioId);
+        $data = MetricaController_resumen($clienteId, $agenciaId);
         echo json_encode($data);
         exit;
     }
@@ -119,10 +119,17 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             exit;
         }
 
+        // Pertenencia por agencia: solo se sirven datos de clientes de la agencia.
+        $clienteGate = $model->obtenerClientePorId($clienteId);
+        if ($clienteGate === null || (int)($clienteGate['agencia_id'] ?? 0) !== $agenciaId) {
+            echo json_encode(['success' => false, 'error' => 'forbidden']);
+            exit;
+        }
+
         // 1. Verificar métricas antiguas y actualizar si es necesario
         $metricaModel = new MetricaModel();
         if (!$metricaModel->hayMetricasRecientes($clienteId, 7)) {
-            DashboardController_extraerYGuardarTodas($clienteId, $usuarioId);
+            DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
         }
 
         // 2. Obtener widgets del dashboard del cliente

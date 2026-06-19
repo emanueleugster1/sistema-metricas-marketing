@@ -5,8 +5,8 @@ require_once __DIR__ . '/../../controllers/dashboardController.php';
 require_once __DIR__ . '/../../controllers/metricaController.php';
 
 $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
-$usuarioId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : 0;
-$dashData = DashboardController_resumen($clienteId, $usuarioId);
+$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
+$dashData = DashboardController_resumen($clienteId, $agenciaId);
 
 $cliente = is_array($dashData) ? ($dashData['clienteInfo'] ?? null) : null;
 $tieneDashboard = is_array($dashData) ? (bool)($dashData['hasDashboard'] ?? false) : false;

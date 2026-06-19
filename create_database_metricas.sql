@@ -9,6 +9,27 @@ COLLATE utf8mb4_unicode_ci;
 
 USE sistema_metricas_marketing;
 
+-- Tabla agencias
+CREATE TABLE agencias (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL,
+    activa BOOLEAN DEFAULT TRUE,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO agencias (nombre) VALUES ('Agencia principal');
+
+-- Tabla roles
+CREATE TABLE roles (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(50) UNIQUE NOT NULL,
+    descripcion VARCHAR(255)
+);
+
+INSERT INTO roles (nombre, descripcion) VALUES
+    ('administrador', 'Administrador de agencia: gestiona usuarios y clientes'),
+    ('usuario', 'Usuario de agencia: gestiona sus clientes');
+
 -- Tabla usuarios
 CREATE TABLE usuarios (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -21,7 +42,11 @@ CREATE TABLE usuarios (
     token_recuperacion VARCHAR(64) NULL,
     fecha_expiracion_token DATETIME NULL,
     intentos_fallidos INT NOT NULL DEFAULT 0,
-    bloqueada_hasta DATETIME NULL
+    bloqueada_hasta DATETIME NULL,
+    rol_id BIGINT NULL,
+    agencia_id BIGINT NULL,
+    FOREIGN KEY (rol_id) REFERENCES roles(id),
+    FOREIGN KEY (agencia_id) REFERENCES agencias(id)
 );
 
 -- Tabla plataformas
@@ -36,13 +61,17 @@ CREATE TABLE plataformas (
 -- Tabla clientes
 CREATE TABLE clientes (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id BIGINT NOT NULL,
+    usuario_id BIGINT NULL,
+    agencia_id BIGINT NULL,
     nombre VARCHAR(255) NOT NULL,
     sector VARCHAR(100),
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
     fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     activo BOOLEAN DEFAULT TRUE,
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    -- usuario_id es el creador (auditoria); la pertenencia es por agencia_id.
+    -- Al borrar un usuario, sus clientes quedan con usuario_id NULL (no se borran).
+    CONSTRAINT fk_clientes_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (agencia_id) REFERENCES agencias(id)
 );
 
 -- Tabla plataforma_campos

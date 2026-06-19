@@ -69,6 +69,11 @@ if ($user !== null) {
     $_SESSION['usuario_id'] = (int)$user['id'];
     $_SESSION['nombre'] = (string)$user['nombre'];
     $_SESSION['email'] = (string)$user['email'];
+    $_SESSION['rol'] = (isset($user['rol']) && $user['rol'] !== null) ? (string)$user['rol'] : 'usuario';
+    // Pertenencia de datos por agencia. Default seguro 0 (fail-closed): si por
+    // algun motivo no tuviera agencia, el filtrado por agencia_id no devolvera
+    // datos en vez de mostrar los de otra agencia. No deberia pasar tras el backfill.
+    $_SESSION['agencia_id'] = (isset($user['agencia_id']) && $user['agencia_id'] !== null) ? (int)$user['agencia_id'] : 0;
     header('Location: /dashboard');
     exit;
 }

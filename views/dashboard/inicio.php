@@ -4,8 +4,8 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 require_once __DIR__ . '/../../controllers/inicioController.php';
 
-$usuarioId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : 0;
-$resumen = InicioController_resumen($usuarioId);
+$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
+$resumen = InicioController_resumen($agenciaId);
 $kpis = $resumen['kpis'];
 $atencion = $resumen['atencion'];
 $actividad = $resumen['actividad'];

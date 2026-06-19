@@ -5,22 +5,22 @@ require_once __DIR__ . '/../config/databaseConfig.php';
 require_once __DIR__ . '/../models/clienteModel.php';
 require_once __DIR__ . '/../api/connectors/metaConnector.php';
 
-function ClienteController_listar(int $usuarioId, ?string $q = null, int $limit = 50, int $offset = 0): array
+function ClienteController_listar(int $agenciaId, ?string $q = null, int $limit = 50, int $offset = 0): array
 {
     $model = new ClienteModel();
-    return $model->listarTodos($limit, $offset, $usuarioId, $q);
+    return $model->listarTodos($limit, $offset, $agenciaId, $q);
 }
 
-function ClienteController_listarEnriquecido(int $usuarioId, ?string $q = null, int $limit = 50, int $offset = 0): array
+function ClienteController_listarEnriquecido(int $agenciaId, ?string $q = null, int $limit = 50, int $offset = 0): array
 {
     $model = new ClienteModel();
-    return $model->listarTodosEnriquecido($usuarioId, $q, $limit, $offset);
+    return $model->listarTodosEnriquecido($agenciaId, $q, $limit, $offset);
 }
 
-function ClienteController_obtener(int $id, int $usuarioId): ?array
+function ClienteController_obtener(int $id, int $agenciaId): ?array
 {
     $model = new ClienteModel();
-    return $model->obtenerPorId($id, $usuarioId);
+    return $model->obtenerPorId($id, $agenciaId);
 }
 
 function ClienteController_plataformas(): array
@@ -61,14 +61,15 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
     }
 
     $model = new ClienteModel();
-    $usuarioId = (int)$_SESSION['usuario_id'];
+    $usuarioId = (int)$_SESSION['usuario_id'];          // creador (auditoria)
+    $agenciaId = (int)($_SESSION['agencia_id'] ?? 0);   // scope de datos (pertenencia por agencia)
 
     if ($method === 'GET' && $action === 'listar') {
         header('Content-Type: application/json');
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
         $offset = isset($_GET['offset']) ? (int)$_GET['offset'] : 0;
         $q = isset($_GET['q']) ? trim((string)$_GET['q']) : null;
-        $rows = $model->listarTodos($limit, $offset, $usuarioId, $q);
+        $rows = $model->listarTodos($limit, $offset, $agenciaId, $q);
         echo json_encode(['success' => true, 'data' => $rows]);
         exit;
     }
@@ -80,7 +81,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             echo json_encode(['success' => false, 'error' => 'invalid_id']);
             exit;
         }
-        $row = $model->obtenerPorId($id, $usuarioId);
+        $row = $model->obtenerPorId($id, $agenciaId);
         echo json_encode(['success' => $row !== null, 'data' => $row]);
         exit;
     }
@@ -111,7 +112,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             echo json_encode(['success' => false, 'error' => 'invalid_id']);
             exit;
         }
-        $cliente = $model->obtenerPorId($cid, $usuarioId);
+        $cliente = $model->obtenerPorId($cid, $agenciaId);
         if ($cliente === null) {
             echo json_encode(['success' => false, 'error' => 'not_found']);
             exit;
@@ -153,7 +154,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         exit;
     }
     
-    $ok = $model->crearClienteConCredenciales($usuarioId, $nombre, $sector, $activo, $credPost);
+    $ok = $model->crearClienteConCredenciales($usuarioId, $agenciaId, $nombre, $sector, $activo, $credPost);
     echo json_encode(['success' => $ok]);
     exit;
     }
@@ -172,14 +173,14 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         exit;
     }
     
-    // Validar que el cliente pertenece al usuario
-    $cliente = $model->obtenerPorId($id, $usuarioId);
+    // Validar que el cliente pertenece a la agencia
+    $cliente = $model->obtenerPorId($id, $agenciaId);
     if ($cliente === null) {
         echo json_encode(['success' => false, 'error' => 'Cliente no encontrado']);
         exit;
     }
     
-    $ok = $model->actualizarClienteConCredenciales($id, $usuarioId, $nombre, $sector, $activo, $credPost);
+    $ok = $model->actualizarClienteConCredenciales($id, $agenciaId, $nombre, $sector, $activo, $credPost);
     echo json_encode(['success' => $ok]);
     exit;
     }
@@ -192,7 +193,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         echo json_encode(['success' => false, 'error' => 'invalid_id']);
         exit;
     }
-    $ok = $model->eliminar($id, $usuarioId);
+    $ok = $model->eliminar($id, $agenciaId);
     echo json_encode(['success' => $ok]);
     exit;
     }

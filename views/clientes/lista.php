@@ -4,9 +4,9 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 require_once __DIR__ . '/../../controllers/clienteController.php';
 
-$usuarioId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : null;
+$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
 $q = isset($_GET['q']) ? trim((string)$_GET['q']) : null;
-$clientes = ClienteController_listarEnriquecido($usuarioId, $q, 100, 0);
+$clientes = ClienteController_listarEnriquecido($agenciaId, $q, 100, 0);
 
 $totalClientes = count($clientes);
 $totalActivos = 0;
