@@ -1,41 +1,84 @@
 <?php
 class MetaConnector
 {
-    private string $base = 'https://graph.facebook.com/v24.0/';
+    private string $base;
+
+    /**
+     * Permisos del token segun la parte del flujo que habilitan (referencia para
+     * afinar manana con un token real, viendo lo que Meta realmente devuelve/exige):
+     *
+     *   ads_read                  -> insights de anuncios, campanias, cuenta publicitaria
+     *                                (act_x/insights, act_x/campaigns, adAccountInfo)
+     *   pages_show_list           -> listar paginas del usuario (me/accounts)
+     *   pages_read_engagement     -> posts e insights de pagina (<page>/posts, <page>/insights)
+     *   read_insights             -> insights de pagina (<page>/insights)            [OPCIONAL]
+     *   instagram_basic           -> cuenta IG vinculada y media (<ig>/media)         [OPCIONAL]
+     *   instagram_manage_insights -> insights de IG (<ig>/insights)                   [OPCIONAL]
+     *
+     * MINIMO para considerar el token "utilizable": basta con poder leer ADS O PAGINA.
+     * Con tener AL MENOS UNO de estos, el sistema ya trae algo util. Los de Instagram
+     * y read_insights NO son obligatorios: si faltan, esas metricas simplemente no se
+     * traen (ausencia normal, no "token invalido"). Ajustar esta constante manana.
+     */
+    private const PERMISOS_MINIMOS = ['ads_read', 'pages_read_engagement'];
+
+    public function __construct(?string $baseUrl = null)
+    {
+        // baseUrl es solo para pruebas (apuntar a un stub local); en produccion = Graph real.
+        $this->base = $baseUrl ?? 'https://graph.facebook.com/v24.0/';
+    }
 
     private function request(string $endpoint, array $params): array
     {
+        // Fix 3 (Tanda 2): el access_token viaja en el header Authorization (Bearer),
+        // no en la querystring, para que no quede en logs de acceso. Graph lo acepta.
+        $headers = ['Accept: application/json'];
+        if (isset($params['access_token'])) {
+            $headers[] = 'Authorization: Bearer ' . (string)$params['access_token'];
+            unset($params['access_token']);
+        }
         $url = $this->base . ltrim($endpoint, '/');
         $qs = http_build_query($params);
-        $ch = curl_init($url . '?' . $qs);
+        $ch = curl_init($url . ($qs !== '' ? ('?' . $qs) : ''));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         $body = curl_exec($ch);
         $err = curl_error($ch);
+        $errno = curl_errno($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         if ($err) {
-            return ['success' => false, 'error' => 'curl_error', 'message' => $err];
+            // Fix 2: timeout / conexion caida = fallo transitorio (reintentable).
+            $transient = in_array($errno, [CURLE_OPERATION_TIMEOUTED, CURLE_COULDNT_CONNECT, CURLE_GOT_NOTHING], true);
+            return ['success' => false, 'error' => 'curl_error', 'message' => $err, 'transient' => $transient];
         }
         $json = json_decode((string)$body, true);
         if ($code >= 200 && $code < 300) {
             return ['success' => true, 'data' => $json];
         }
         if (is_array($json) && isset($json['error'])) {
+            $graphCode = $json['error']['code'] ?? null;
+            // Fix 2: rate-limit de Graph (limites de app/usuario) o 5xx = transitorio.
+            // Codes 4/17/32/613 segun docs de Graph; afinar manana con respuestas reales.
+            $transient = ($code === 429)
+                || in_array((int)$graphCode, [4, 17, 32, 613], true)
+                || $code >= 500;
             return [
                 'success' => false,
                 'error' => 'graph_error',
                 'status' => $code,
                 'type' => $json['error']['type'] ?? null,
-                'code' => $json['error']['code'] ?? null,
+                'code' => $graphCode,
                 'subcode' => $json['error']['error_subcode'] ?? null,
                 'message' => $json['error']['message'] ?? null,
                 'fbtrace_id' => $json['error']['fbtrace_id'] ?? null,
+                'transient' => $transient,
             ];
         }
-        return ['success' => false, 'error' => 'http_error', 'status' => $code, 'data' => $json];
+        // Fix 2: error HTTP sin cuerpo Graph: 429/5xx tambien son transitorios.
+        return ['success' => false, 'error' => 'http_error', 'status' => $code, 'data' => $json, 'transient' => ($code === 429 || $code >= 500)];
     }
 
     private function normalizeAccountId(string $adAccountId): string
@@ -158,6 +201,47 @@ class MetaConnector
     public function validateToken(string $accessToken): array
     {
         return $this->request('me', ['fields' => 'id,name', 'access_token' => $accessToken]);
+    }
+
+    /**
+     * Fix 1 (Tanda 2): valida permisos REALES del token (no solo que /me responda).
+     * Consulta /me/permissions y decide si el token es "utilizable" segun PERMISOS_MINIMOS.
+     * Devuelve:
+     *   ['success'=>bool, 'indeterminado'=>bool, 'usable'=>bool, 'granted'=>[], 'faltantes'=>[]]
+     * Si no se puede determinar (la llamada falla), NO bloquea: 'usable'=>true + indeterminado.
+     */
+    public function validatePermissions(string $accessToken, ?array $minimos = null): array
+    {
+        $minimos = $minimos ?? self::PERMISOS_MINIMOS;
+        $resp = $this->request('me/permissions', ['access_token' => $accessToken]);
+        if (!($resp['success'] ?? false)) {
+            // No determinable: no rompemos tokens que hoy funcionan.
+            return ['success' => false, 'indeterminado' => true, 'usable' => true, 'granted' => [], 'faltantes' => [], 'detail' => $resp];
+        }
+        $lista = (isset($resp['data']['data']) && is_array($resp['data']['data'])) ? $resp['data']['data'] : [];
+        return ['success' => true, 'indeterminado' => false] + self::analizarPermisos($lista, $minimos);
+    }
+
+    /**
+     * Parser puro (testeable sin red): a partir de la lista de /me/permissions
+     * ([{permission, status}, ...]) calcula granted/usable/faltantes.
+     * 'usable' = tiene AL MENOS UNO de los minimos (ads O pagina).
+     */
+    public static function analizarPermisos(array $lista, array $minimos): array
+    {
+        $granted = [];
+        foreach ($lista as $item) {
+            if (!is_array($item)) continue;
+            $perm = (string)($item['permission'] ?? '');
+            $status = (string)($item['status'] ?? '');
+            if ($perm !== '' && $status === 'granted') { $granted[] = $perm; }
+        }
+        $minPresentes = array_values(array_intersect($minimos, $granted));
+        return [
+            'granted'   => $granted,
+            'usable'    => count($minPresentes) > 0,
+            'faltantes' => array_values(array_diff($minimos, $granted)),
+        ];
     }
 
     public function instagramPosts(string $accessToken, string $instagramBusinessId, int $limit = 10): array

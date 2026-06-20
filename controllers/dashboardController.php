@@ -83,43 +83,55 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
         $meta = new MetaConnector();
         $valid = $meta->validateToken($accessToken);
         if (!$valid['success']) continue;
+        // Fix 2 (Tanda 2): si alguna llamada falla de forma transitoria (rate-limit /
+        // 5xx / timeout), marcamos la corrida para NO persistir el lote parcial.
+        $huboTransitorio = false;
+        $chequear = function(array $resp) use (&$huboTransitorio): array {
+            if (!($resp['success'] ?? false) && ($resp['transient'] ?? false)) { $huboTransitorio = true; }
+            return $resp;
+        };
         $adsFields = ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'];
         $pageMetrics = ['page_impressions','page_engaged_users','page_fans'];
         $igUserMetrics = ['ig_impressions','ig_reach','ig_profile_views','ig_follower_count'];
         $currency = '';
         if ($adAccountId !== '') {
-            $acc = $meta->adAccountInfo($accessToken, $adAccountId);
+            $acc = $chequear($meta->adAccountInfo($accessToken, $adAccountId));
             if ($acc['success']) { $currency = (string)($acc['data']['currency'] ?? ''); }
         }
         $adsData = [];
         if ($adAccountId !== '') {
-            $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', $adsFields);
+            $ins = $chequear($meta->insights($accessToken, $adAccountId, 'last_30d', $adsFields));
             if ($ins['success']) { $adsData = $ins['data']['data'] ?? []; }
         }
         $pageInsights = [];
         if ($pageId !== '') {
-            $pis = $meta->pageInsights($accessToken, $pageId, $pageMetrics, 'days_28');
+            $pis = $chequear($meta->pageInsights($accessToken, $pageId, $pageMetrics, 'days_28'));
             if ($pis['success']) { $pageInsights = $pis['data']['data'] ?? []; }
         }
         $igInsights = [];
         if ($igBusinessId !== '') {
-            $iis = $meta->instagramUserInsights($accessToken, $igBusinessId, $igUserMetrics, 'day');
+            $iis = $chequear($meta->instagramUserInsights($accessToken, $igBusinessId, $igUserMetrics, 'day'));
             if ($iis['success']) { $igInsights = $iis['data']['data'] ?? []; }
         }
         $postsIg = [];
         if ($igBusinessId !== '') {
-            $ip = $meta->instagramPosts($accessToken, $igBusinessId, 10);
+            $ip = $chequear($meta->instagramPosts($accessToken, $igBusinessId, 10));
             if ($ip['success']) { $postsIg = $ip['data']['data'] ?? []; }
         }
         $postsFb = [];
         if ($pageId !== '') {
-            $pp = $meta->pagePosts($accessToken, $pageId, 10);
+            $pp = $chequear($meta->pagePosts($accessToken, $pageId, 10));
             if ($pp['success']) { $postsFb = $pp['data']['data'] ?? []; }
         }
         $campaigns = [];
         if ($adAccountId !== '') {
-            $camps = $meta->campaigns($accessToken, $adAccountId, 'ACTIVE');
+            $camps = $chequear($meta->campaigns($accessToken, $adAccountId, 'ACTIVE'));
             if ($camps['success']) { $campaigns = $camps['data']['data'] ?? []; }
+        }
+        // Fix 2: corrida envenenada por rate-limit/transitorio -> NO persistir lote parcial.
+        // Asi hayMetricasRecientes() sigue false y la proxima carga reintenta pronto.
+        if ($huboTransitorio) {
+            return ['success' => false, 'inserted' => 0, 'rate_limited' => true];
         }
         $nowDate = date('Y-m-d');
         $valueFromAds = function(array $data, string $field) {
@@ -216,6 +228,13 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
                     $errores[] = 'token_meta_invalido';
                     continue;
                 }
+                // Fix 1 (Tanda 2): el token responde, pero ¿tiene permisos utiles?
+                // Si no tiene ni lectura de ads ni de pagina, no traera nada: avisamos.
+                $permisos = $meta->validatePermissions($accessToken);
+                if (($permisos['usable'] ?? true) === false) {
+                    $errores[] = 'permisos_insuficientes';
+                    continue;
+                }
                 $visibleWidgets = array_filter($widgets, fn($w) => (int)$w['visible'] === 1);
                 $needFields = [];
                 $needPagePosts = false;
@@ -239,7 +258,12 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
                 $api_errors = [];
                 $fresh = $clienteModel->hayMetricasRecientes($clienteId, 7);
                 if (!$fresh) {
-                    DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
+                    // Fix 2 (Tanda 2): si la extraccion fue rate-limiteada, avisamos
+                    // (no se cachea nada parcial; se reintenta en la proxima carga).
+                    $resExtra = DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
+                    if (is_array($resExtra) && ($resExtra['rate_limited'] ?? false)) {
+                        $errores[] = 'meta_rate_limited';
+                    }
                 }
                 $values = [];
                 if ($adAccountId !== '') {
@@ -334,7 +358,7 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
 
     // 2. Solo generar con IA si es necesario
     if ($generarNuevaAI) {
-        $allRows = $clienteModel->obtenerMetricasPorCliente($clienteId);
+        $allRows = $clienteModel->obtenerMetricasPorCliente($clienteId, 5, 365);
         if (!empty($allRows)) {
             $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
             $filtered = !empty($selected) ? array_values(array_filter($allRows, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
@@ -473,7 +497,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         $model = new DashboardModel();
         $dashboard = $model->obtenerDashboardPorCliente($clienteId);
         $widgets = $dashboard ? $model->obtenerWidgetsPorDashboard((int)$dashboard['id']) : [];
-        $rowsNow = $mm->obtenerMetricasPorCliente($clienteId);
+        $rowsNow = $mm->obtenerMetricasPorCliente($clienteId, 5, 365);
         $contenido = '';
         if (!empty($rowsNow) && !empty($widgets)) {
             $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));

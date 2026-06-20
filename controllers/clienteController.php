@@ -135,6 +135,13 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             echo json_encode(['success' => false, 'error' => 'invalid_token', 'detail' => $valid]);
             exit;
         }
+        // Fix 1 (Tanda 2): "validado" debe significar "tiene permisos utiles".
+        // Si el token no puede leer ni ads ni pagina, no sirve: lo informamos al conectar.
+        $permisos = $meta->validatePermissions($token);
+        if (($permisos['usable'] ?? true) === false) {
+            echo json_encode(['success' => false, 'error' => 'permisos_insuficientes', 'detail' => $permisos]);
+            exit;
+        }
         $all = $meta->getAllUserData($token);
         echo json_encode(['success' => $all['success'] ?? false, 'data' => $all]);
         exit;

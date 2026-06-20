@@ -46,14 +46,21 @@ final class MetricaModel
         return $stmt->fetchAll() ?: [];
     }
 
-    public function obtenerMetricasPorCliente(int $clienteId): array
+    public function obtenerMetricasPorCliente(int $clienteId, int $plataformaId = 5, ?int $dias = null): array
     {
+        // Fix 4 (Tanda 2): filtra por plataforma (correctitud, hoy solo Meta=5) y, si
+        // se pide, por ventana de fecha (acota el historico que alimenta el ML).
         $sql = 'SELECT id, cliente_id, plataforma_id, fecha_metrica, nombre_metrica, valor, unidad, fecha_extraccion, fecha_creacion
                 FROM metricas
-                WHERE cliente_id = ?
-                ORDER BY fecha_metrica DESC, nombre_metrica ASC';
+                WHERE cliente_id = ? AND plataforma_id = ?';
+        $params = [$clienteId, $plataformaId];
+        if ($dias !== null) {
+            $sql .= ' AND fecha_metrica >= (NOW() - INTERVAL ? DAY)';
+            $params[] = max(1, $dias);
+        }
+        $sql .= ' ORDER BY fecha_metrica DESC, nombre_metrica ASC';
         $stmt = $this->db->prepare($sql);
-        $stmt->execute([$clienteId]);
+        $stmt->execute($params);
         return $stmt->fetchAll() ?: [];
     }
 
