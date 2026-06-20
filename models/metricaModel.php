@@ -205,6 +205,10 @@ final class MetricaModel
 
     public function insertarRecomendacionML(int $clienteId, string $contenido): bool
     {
+        // Fix 4: una recomendacion vacia/solo-espacios no se guarda (no ensucia el cache).
+        if (trim($contenido) === '') {
+            return false;
+        }
         $sql = 'INSERT INTO recomendaciones_ml (cliente_id, contenido) VALUES (?, ?)';
         $stmt = $this->db->prepare($sql);
         try {

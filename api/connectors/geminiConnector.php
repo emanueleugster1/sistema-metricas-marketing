@@ -64,7 +64,14 @@ final class GeminiConnector
         return $buffer;
     }
 
-    public function translateRecommendation(string $recommendationText, string $promptInstructions): string
+    /**
+     * Devuelve un resultado estructurado en vez de un string in-band:
+     *   ['success' => true,  'text'  => '<recomendacion>']
+     *   ['success' => false, 'error' => '<detalle del fallo>']
+     * Asi el caller distingue una recomendacion real de un error (429, bloqueo, etc.)
+     * y no lo persiste como si fuera valido.
+     */
+    public function translateRecommendation(string $recommendationText, string $promptInstructions): array
     {
 
         $internalPrompt = 'Actúas como un Especialista Técnico de Marketing. Tu tarea es analizar la recomendación técnica de ML y traducirla a una conclusión clara y una acción ejecutiva.
@@ -106,18 +113,21 @@ final class GeminiConnector
             $status = (string)($resp['status'] ?? '');
             $msg = is_array($resp['data'] ?? null) ? ($resp['data']['error']['message'] ?? '') : '';
             $err = (string)($resp['error'] ?? 'unknown_error');
-            return 'Error ' . ($status !== '' ? $status . ' ' : '') . $err . ($msg !== '' ? (': ' . $msg) : '');
+            $detalle = 'Error ' . ($status !== '' ? $status . ' ' : '') . $err . ($msg !== '' ? (': ' . $msg) : '');
+            return ['success' => false, 'error' => $detalle];
         }
         $text = $this->extractTextFromResponse($resp);
-        if ($text !== '') return $text;
+        if ($text !== '') {
+            return ['success' => true, 'text' => $text];
+        }
         $data = $resp['data'] ?? [];
         if (isset($data['promptFeedback']['blockReason'])) {
-            return 'Salida bloqueada: ' . (string)$data['promptFeedback']['blockReason'];
+            return ['success' => false, 'error' => 'Salida bloqueada: ' . (string)$data['promptFeedback']['blockReason']];
         }
         $cand0 = $data['candidates'][0] ?? [];
         if (isset($cand0['finishReason'])) {
-            return 'Finalizado: ' . (string)$cand0['finishReason'];
+            return ['success' => false, 'error' => 'Finalizado: ' . (string)$cand0['finishReason']];
         }
-        return 'No se recibió texto del modelo.';
+        return ['success' => false, 'error' => 'No se recibió texto del modelo.'];
     }
 }

@@ -3,6 +3,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
 
 require_once __DIR__ . '/../../controllers/dashboardController.php';
 require_once __DIR__ . '/../../controllers/metricaController.php';
+require_once __DIR__ . '/../../includes/metaErrores.php';
 
 $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
 $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
@@ -190,6 +191,32 @@ function metricas_rel(?string $fecha): string {
         <a class="btn btn-secondary" href="/clientes/lista"><i class="bi bi-arrow-left"></i> Volver</a>
       </div>
     </header>
+
+    <?php
+      // Fix 2: traducir los codigos de error a lenguaje claro, separando los fallos
+      // reales (que el usuario debe atender) de las ausencias normales (informativas).
+      $erroresMeta = traducirErroresMeta($errores);
+    ?>
+    <?php if (!empty($erroresMeta['errores'])): ?>
+      <section class="panel" style="border-left: 3px solid var(--color-danger);">
+        <div class="panel-header">
+          <h2 class="panel-title"><i class="bi bi-exclamation-triangle"></i> No se pudieron cargar algunos datos</h2>
+        </div>
+        <div class="panel-body">
+          <ul style="margin: 0; padding-left: var(--spacing-lg);">
+            <?php foreach ($erroresMeta['errores'] as $msg): ?>
+              <li><?= htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') ?></li>
+            <?php endforeach; ?>
+          </ul>
+        </div>
+      </section>
+    <?php endif; ?>
+    <?php if (!empty($erroresMeta['avisos'])): ?>
+      <p class="cell-empty" style="margin: 0 0 var(--spacing-md);">
+        <i class="bi bi-info-circle"></i>
+        <?= htmlspecialchars(implode(' · ', $erroresMeta['avisos']), ENT_QUOTES, 'UTF-8') ?>
+      </p>
+    <?php endif; ?>
 
     <?php if ($tieneDashboard): ?>
       <div class="cards">

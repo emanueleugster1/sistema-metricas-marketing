@@ -10,19 +10,29 @@ require_once __DIR__ . '/../api/ml/RecomendadorML.php';
 
 function DashboardController_buildRecommendations(array $rows, array $featureKeys): array
 {
-    $ml = new RecomendadorML();
-    $mlText = $ml->recomendar($rows, $featureKeys);
+    // Fix 3: el ML puede lanzar (matriz singular / features colineales). Si falla,
+    // degradamos sin romper el dashboard: seguimos sin texto tecnico de ML.
+    $mlText = '';
+    try {
+        $ml = new RecomendadorML();
+        $mlText = (string)$ml->recomendar($rows, $featureKeys);
+    } catch (\Throwable $e) {
+        $mlText = '';
+    }
     $env = _readEnvFile(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
     $apiKey = (string)($env['GEMINI_API_KEY'] ?? getenv('GEMINI_API_KEY') ?: '');
     $aiMl = '';
-    if ($apiKey !== '') {
+    $aiOk = false;
+    if ($apiKey !== '' && $mlText !== '') {
         $gemini = new GeminiConnector($apiKey);
-
-        if ($mlText !== '') {
-            $aiMl = $gemini->translateRecommendation($mlText, 'Explica recomendacion en lenguaje sencillo. En español.');
+        $res = $gemini->translateRecommendation($mlText, 'Explica recomendacion en lenguaje sencillo. En español.');
+        // Fix 1: solo es una recomendacion valida si Gemini respondio bien.
+        if (is_array($res) && ($res['success'] ?? false) === true) {
+            $aiMl = (string)($res['text'] ?? '');
+            $aiOk = $aiMl !== '';
         }
     }
-    return ['ml' => (string)$mlText, 'ai_ml' => (string)$aiMl];
+    return ['ml' => (string)$mlText, 'ai_ml' => $aiMl, 'ai_ok' => $aiOk];
 }
 
 function DashboardController_actualizarWidgets(int $dashboardId, array $widgetsIds, int $agenciaId): array
@@ -330,11 +340,13 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
             $filtered = !empty($selected) ? array_values(array_filter($allRows, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
             if (!empty($filtered)) {
                 $rec = DashboardController_buildRecommendations($filtered, $selected);
-                $recomMl = (string)$rec['ai_ml'];
                 $traduccionAi = (string)$rec['ml'];
-                
-                // Guardar la nueva recomendación
-                if ($recomMl !== '') {
+
+                // Fix 1: solo persistir/cachear si la IA respondio bien y no vacio.
+                // Un fallo transitorio (429, bloqueo) NO contamina el cache: se deja
+                // intacta la ultima recomendacion valida previa (si existe).
+                if (($rec['ai_ok'] ?? false) === true && (string)$rec['ai_ml'] !== '') {
+                    $recomMl = (string)$rec['ai_ml'];
                     $clienteModel->insertarRecomendacionML($clienteId, $recomMl);
                     // Actualizar referencia
                     $ultimaRec = $clienteModel->obtenerUltimaRecomendacionML($clienteId);
@@ -472,7 +484,11 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
                 if ($contenido === '' && (string)$rec['ai_ml'] !== '') { $contenido = (string)$rec['ai_ml']; }
             }
         }
-        $mm->insertarRecomendacionML($clienteId, $contenido !== '' ? $contenido : '');
+        // Fix 4: no persistir recomendaciones vacias (resetean el cache de 7 dias
+        // y pueden tapar una recomendacion buena anterior).
+        if ($contenido !== '') {
+            $mm->insertarRecomendacionML($clienteId, $contenido);
+        }
         if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
             header_remove('Content-Type');
             header('Location: /clientes/metricas/' . $clienteId);

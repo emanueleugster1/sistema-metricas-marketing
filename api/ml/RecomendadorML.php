@@ -37,15 +37,31 @@ final class RecomendadorML
         }
         $trained = false;
         $model = null;
-        if (count($X) >= 5) { $model = new LeastSquares(); $model->train($X, $y); $trained = true; }
+        // Fix 3: el entrenamiento puede lanzar si la matriz es singular o los datos
+        // son pobres. Si falla, degradamos: omitimos la proyeccion pero el resto del
+        // analisis (resumen, comparativa, diagnostico) se mantiene.
+        if (count($X) >= 5) {
+            try {
+                $model = new LeastSquares();
+                $model->train($X, $y);
+                $trained = true;
+            } catch (\Throwable $e) {
+                $trained = false;
+                $model = null;
+            }
+        }
 
         $latestMap = reset($byDate) ?: [];
         $latest = $allFeatureRows[0] ?? null;
 
-        
-
         $predCtr = null;
-        if ($trained && $latest && $target === 'ctr') { $predCtr = (float)$model->predict($latest); }
+        if ($trained && $latest && $target === 'ctr') {
+            try {
+                $predCtr = (float)$model->predict($latest);
+            } catch (\Throwable $e) {
+                $predCtr = null;
+            }
+        }
 
         
 
