@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/databaseConfig.php';
+require_once __DIR__ . '/../includes/credencialesCifrado.php';
 
 final class DashboardModel
 {
@@ -63,8 +64,8 @@ final class DashboardModel
         if (!$row || !isset($row['credenciales'])) {
             return null;
         }
-        $data = json_decode((string)$row['credenciales'], true);
-        return is_array($data) ? $data : null;
+        $data = credencialesDescifrar((string)$row['credenciales']);
+        return !empty($data) ? $data : null;
     }
 
     public function crearDashboard(int $clienteId, string $nombre, ?string $descripcion = null): ?int

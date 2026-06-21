@@ -91,7 +91,7 @@ CREATE TABLE credenciales_plataforma (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     cliente_id BIGINT NOT NULL,
     plataforma_id BIGINT NOT NULL,
-    credenciales JSON NOT NULL,
+    credenciales JSON NOT NULL, -- sobre JSON {"_cifrado","_dato"} con el contenido sensible cifrado (libsodium); ver includes/credencialesCifrado.php
     validada BOOLEAN DEFAULT FALSE,
     fecha_validacion DATETIME NULL,
     fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -183,7 +183,7 @@ NOTAS SOBRE EL DISEÃ‘O:
 2. PLATAFORMAS: CatÃ¡logo de plataformas publicitarias disponibles (Meta, Google, etc.)
 3. CLIENTES: Clientes de cada agencia con informaciÃ³n bÃ¡sica
 4. PLATAFORMA_CAMPOS: ConfiguraciÃ³n dinÃ¡mica de campos por plataforma
-5. CREDENCIALES_PLATAFORMA: Almacena credenciales API en formato JSON encriptado
+5. CREDENCIALES_PLATAFORMA: Almacena credenciales API en JSON, cifrado con libsodium (secretbox) antes de persistir; clave en .env (CREDENCIALES_KEY)
 6. METRICAS: Datos histÃ³ricos de mÃ©tricas extraÃ­das de APIs
 7. RECOMENDACIONES_ML: AnÃ¡lisis predictivo generado por PHP-ML
 8. WIDGETS: Componentes configurables para dashboards
@@ -191,7 +191,7 @@ NOTAS SOBRE EL DISEÃ‘O:
 10. DASHBOARD_WIDGETS: RelaciÃ³n configuraciÃ³n de widgets en dashboards
 
 CARACTERÃSTICAS DE SEGURIDAD:
-- Credenciales almacenadas en JSON para flexibilidad
+- Credenciales en JSON cifrado en reposo con libsodium (secretbox); clave en .env (CREDENCIALES_KEY)
 - Ãndices optimizados para consultas frecuentes
 - Cascade delete para integridad referencial
 - Campos de auditorÃ­a (fecha_creacion, fecha_actualizacion)

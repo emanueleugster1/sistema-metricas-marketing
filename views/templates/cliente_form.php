@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../includes/credencialesCifrado.php';
 $titulo = isset($isEdit) && $isEdit ? 'Editar cliente' : 'Nuevo cliente';
 $subtitulo = isset($isEdit) && $isEdit
     ? 'Actualizá los datos y las conexiones del cliente.'
@@ -118,11 +119,18 @@ $validadaMap = isset($validadaMap) && is_array($validadaMap) ? $validadaMap : []
               <?php
                 $nombreCampo = (string)$c['nombre_campo'];
                 $labelCampo = (string)$c['label'];
-                $val = $credencialesMap[$pid][$nombreCampo] ?? '';
+                // Arreglo 2 (HU-005): los campos sensibles (token) NO se muestran.
+                $esSensible = in_array($nombreCampo, camposSensiblesCredenciales(), true);
+                $hayGuardado = $esSensible && !empty($credencialesMap[$pid][$nombreCampo]);
+                // El token nunca viaja al navegador: el campo va vacio.
+                $val = $esSensible ? '' : ($credencialesMap[$pid][$nombreCampo] ?? '');
               ?>
               <div class="form-field">
                 <label><?= htmlspecialchars($labelCampo, ENT_QUOTES, 'UTF-8') ?></label>
                 <input type="text" name="cred[<?= $pid ?>][<?= htmlspecialchars($nombreCampo, ENT_QUOTES, 'UTF-8') ?>]" value="<?= htmlspecialchars((string)$val, ENT_QUOTES, 'UTF-8') ?>" placeholder="<?= htmlspecialchars($labelCampo, ENT_QUOTES, 'UTF-8') ?>…" <?= $checked ? '' : 'disabled' ?> readonly>
+                <?php if ($hayGuardado): ?>
+                  <small class="form-hint">Ya hay un token guardado. Dejá en blanco para mantenerlo, o ingresá uno nuevo para reemplazarlo.</small>
+                <?php endif; ?>
               </div>
             <?php endforeach; ?>
           </div>

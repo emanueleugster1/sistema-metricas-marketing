@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/databaseConfig.php';
+require_once __DIR__ . '/../includes/credencialesCifrado.php';
 
 class ClienteModel
 {
@@ -153,12 +154,9 @@ class ClienteModel
             $stmtCred = $this->db->prepare($sqlCred);
 
             foreach ($credencialesPorPlataforma as $plataformaId => $campos) {
-                $json = json_encode($campos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                if ($json === false) {
-                    $this->db->rollBack();
-                    return false;
-                }
-                $ok = $stmtCred->execute([$clienteId, (int)$plataformaId, $json]);
+                // Arreglo 1: se persiste cifrado (credencialesCifrar lanza si falta la clave).
+                $blob = credencialesCifrar($campos);
+                $ok = $stmtCred->execute([$clienteId, (int)$plataformaId, $blob]);
                 if (!$ok) {
                     $this->db->rollBack();
                     return false;
@@ -183,8 +181,8 @@ class ClienteModel
         $rows = $stmt->fetchAll();
         $result = [];
         foreach ($rows as $r) {
-            $decoded = json_decode((string)$r['credenciales'], true);
-            $result[(int)$r['plataforma_id']] = is_array($decoded) ? $decoded : [];
+            $decoded = credencialesDescifrar((string)$r['credenciales']);
+            $result[(int)$r['plataforma_id']] = $decoded;
         }
         return $result;
     }
@@ -218,7 +216,7 @@ class ClienteModel
                 return false;
             }
 
-            $sqlSel = 'SELECT id FROM credenciales_plataforma WHERE cliente_id = ? AND plataforma_id = ? LIMIT 1';
+            $sqlSel = 'SELECT id, credenciales FROM credenciales_plataforma WHERE cliente_id = ? AND plataforma_id = ? LIMIT 1';
             $stmtSel = $this->db->prepare($sqlSel);
 
             $sqlIns = 'INSERT INTO credenciales_plataforma (cliente_id, plataforma_id, credenciales, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, NOW(), NOW())';
@@ -227,18 +225,42 @@ class ClienteModel
             $sqlUpdCred = 'UPDATE credenciales_plataforma SET credenciales = ?, fecha_actualizacion = NOW() WHERE cliente_id = ? AND plataforma_id = ?';
             $stmtUpdCred = $this->db->prepare($sqlUpdCred);
 
+            $sensibles = camposSensiblesCredenciales();
+
             foreach ($credencialesPorPlataforma as $plataformaId => $campos) {
-                $json = json_encode($campos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                if ($json === false) {
-                    $this->db->rollBack();
-                    return false;
-                }
                 $stmtSel->execute([$clienteId, (int)$plataformaId]);
-                $exists = $stmtSel->fetch() !== false;
+                $rowExist = $stmtSel->fetch();
+                $exists = $rowExist !== false;
+
                 if ($exists) {
-                    $ok = $stmtUpdCred->execute([$json, $clienteId, (int)$plataformaId]);
+                    $colExist = (string)($rowExist['credenciales'] ?? '');
+                    $existentes = credencialesDescifrar($colExist);
+                    // ¿El valor guardado estaba cifrado pero no se pudo descifrar?
+                    $existenteIlegible = ($colExist !== ''
+                        && credencialesEstaCifrado($colExist)
+                        && descifrarTextoCredencial($colExist) === null);
+
+                    // Arreglo 2: merge "vacio = mantener" para los campos sensibles.
+                    $noSobreescribir = false;
+                    foreach ($sensibles as $cs) {
+                        $entrante = isset($campos[$cs]) ? trim((string)$campos[$cs]) : '';
+                        if ($entrante !== '') {
+                            continue; // viene uno nuevo: reemplaza
+                        }
+                        if (!empty($existentes[$cs])) {
+                            $campos[$cs] = $existentes[$cs]; // mantener el token actual
+                        } elseif ($existenteIlegible) {
+                            $noSobreescribir = true; // no se puede recuperar: guard anti-borrado
+                        }
+                    }
+                    if ($noSobreescribir) {
+                        continue; // dejamos las credenciales de esta plataforma intactas
+                    }
+                    $blob = credencialesCifrar($campos);
+                    $ok = $stmtUpdCred->execute([$blob, $clienteId, (int)$plataformaId]);
                 } else {
-                    $ok = $stmtIns->execute([$clienteId, (int)$plataformaId, $json]);
+                    $blob = credencialesCifrar($campos);
+                    $ok = $stmtIns->execute([$clienteId, (int)$plataformaId, $blob]);
                 }
                 if (!$ok) {
                     $this->db->rollBack();
