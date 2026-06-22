@@ -58,6 +58,13 @@ CREATE TABLE plataformas (
     activa BOOLEAN DEFAULT TRUE
 );
 
+-- Seed de la plataforma Meta con id EXPLICITO = 5.
+-- El codigo depende de este id en multiples lugares, por eso se fija a mano (no
+-- AUTO_INCREMENT) para que una instalacion nueva reproduzca el mismo id de produccion.
+-- INSERT IGNORE: seguro de re-ejecutar (omite si ya existe) e identico en MySQL y MariaDB.
+INSERT IGNORE INTO plataformas (id, nombre, tipo, api_base_url, activa) VALUES
+    (5, 'Meta', 'social_ads', 'https://graph.facebook.com', 1);
+
 -- Tabla clientes
 CREATE TABLE clientes (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -85,6 +92,13 @@ CREATE TABLE plataforma_campos (
     descripcion VARCHAR(255),
     FOREIGN KEY (plataforma_id) REFERENCES plataformas(id) ON DELETE CASCADE
 );
+
+-- Seed de los campos de credenciales de Meta (plataforma_id = 5), con id explicitos.
+-- Va DESPUES de sembrar plataformas (FK plataforma_id -> plataformas).
+INSERT IGNORE INTO plataforma_campos (id, plataforma_id, nombre_campo, label, tipo, orden, descripcion) VALUES
+    (1, 5, 'access_token',  'Access Token',  'password', 1, NULL),
+    (2, 5, 'page_id',       'Page ID',       'text',     2, NULL),
+    (3, 5, 'ad_account_id', 'Ad Account ID', 'text',     3, NULL);
 
 -- Tabla credenciales_plataforma
 CREATE TABLE credenciales_plataforma (
