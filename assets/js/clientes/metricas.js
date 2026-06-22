@@ -4,14 +4,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const pathMatch = window.location.pathname.match(/\/clientes\/metricas\/(\d+)/);
     const clienteId = (pathMatch && pathMatch[1]) || params.get('cliente_id');
-    const dias = 30;
+    // CAMBIO 1: rango del selector (whitelist {30,60,90}, default 30).
+    const diasParam = parseInt(params.get('dias'), 10);
+    const dias = [30, 60, 90].includes(diasParam) ? diasParam : 30;
+
+    // El selector recarga con ?dias=N (re-render server-side + datos en vivo).
+    const selector = document.getElementById('rango-dias-select');
+    if (selector) {
+        selector.value = String(dias);
+        selector.addEventListener('change', () => {
+            const next = new URLSearchParams(window.location.search);
+            next.set('dias', selector.value);
+            window.location.search = next.toString();
+        });
+    }
 
     if (clienteId) {
         fetch(`/controllers/metricaController.php?action=widgets_data&cliente_id=${clienteId}&dias=${dias}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    renderizarWidgets(data.metricasHistoricas, data.widgets);
+                    renderizarWidgets(data.metricasHistoricas, data.widgets, data.liveAds || {});
                 } else {
                     console.error('Error al cargar datos:', data.error);
                 }
@@ -20,8 +33,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-function renderizarWidgets(metricas, widgets) {
+function renderizarWidgets(metricas, widgets, liveAds = {}) {
     widgets.forEach(widget => {
+        // CAMBIO 1: tarjeta tipo 'metric' de ads con lectura EN VIVO de la ventana
+        // elegida (60/90). Si hay valor live para esta métrica, se muestra directo;
+        // la serie histórica (charts) queda intacta.
+        if (widget.tipo_visualizacion === 'metric' && liveAds[widget.metrica_principal]) {
+            mostrarMetricaLive(widget.widget_id, liveAds[widget.metrica_principal]);
+            return;
+        }
+
         // Filtrar y preparar datos para este widget
         const metricaData = filtrarDatosPorWidget(metricas, widget);
         
@@ -50,6 +71,20 @@ function renderizarWidgets(metricas, widgets) {
                 break;
         }
     });
+}
+
+// CAMBIO 1: render de una tarjeta 'metric' a partir del valor en vivo de la ventana.
+// Sin flecha de tendencia: es un agregado de la ventana, no una serie con punto previo.
+function mostrarMetricaLive(widgetId, live) {
+    const container = document.getElementById(`metric-${widgetId}`);
+    if (!container) return;
+    const num = parseFloat(live.valor);
+    const formattedVal = isNaN(num)
+        ? '—'
+        : new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(num);
+    const unidad = live.unidad ? ' ' + live.unidad : '';
+    container.innerHTML = `${formattedVal}${unidad}`;
+    removeLoader(widgetId);
 }
 
 function removeLoader(widgetId) {

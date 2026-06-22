@@ -35,6 +35,23 @@ final class MetricaModel
         return !empty($data) ? $data : null;
     }
 
+    /**
+     * CAMBIO 2: marca el estado de validacion de la credencial de una plataforma.
+     * Best-effort: si el UPDATE falla, NO propaga la excepcion (no debe abortar el
+     * render del dashboard). Setea fecha_validacion=NOW() para registrar el ultimo
+     * chequeo. La columna validada es tinyint(1); UPDATE simple compatible MariaDB 10.5.
+     */
+    public function marcarValidada(int $clienteId, int $plataformaId, bool $ok): void
+    {
+        try {
+            $sql = 'UPDATE credenciales_plataforma SET validada = ?, fecha_validacion = NOW() WHERE cliente_id = ? AND plataforma_id = ?';
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$ok ? 1 : 0, $clienteId, $plataformaId]);
+        } catch (Throwable $e) {
+            // best-effort: el estado del badge no debe romper la carga de metricas.
+        }
+    }
+
     public function obtenerMetricasHistoricas(int $clienteId, int $dias = 30): array
     {
         $dias = max(1, $dias);

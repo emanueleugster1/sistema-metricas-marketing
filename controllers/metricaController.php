@@ -14,8 +14,10 @@ function MetricaController_ultima_fecha(int $clienteId): ?string
     return $model->obtenerUltimaFecha($clienteId);
 }
 
-function MetricaController_resumen(int $clienteId, int $agenciaId): array
+function MetricaController_resumen(int $clienteId, int $agenciaId, int $dias = 30): array
 {
+    $dias = DashboardController_diasWhitelist($dias);
+    $adsTimeRange = DashboardController_timeRangeDias($dias);
     $model = new MetricaModel();
     $cliente = $model->obtenerClientePorId($clienteId);
     if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
@@ -56,7 +58,7 @@ function MetricaController_resumen(int $clienteId, int $agenciaId): array
                     if ($ip['success']) { $metricasReales['instagram_posts'] = $ip['data']['data'] ?? []; } else { $errores[] = 'instagram_posts_error'; }
                 } else { $errores[] = 'instagram_business_account_id_faltante'; }
                 if ($adAccountId !== '') {
-                    $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks']);
+                    $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'], $adsTimeRange);
                     if ($ins['success']) { $metricasReales['insights_30d'] = $ins['data']['data'] ?? []; } else { $errores[] = 'insights_error'; }
                     $camps = $meta->campaigns($accessToken, $adAccountId, 'ACTIVE');
                     if ($camps['success']) { $metricasReales['campaigns_activas'] = $camps['data']['data'] ?? []; } else { $errores[] = 'campaigns_error'; }
@@ -81,6 +83,67 @@ function MetricaController_resumen(int $clienteId, int $agenciaId): array
         'errores' => $errores,
     ];
 }
+/**
+ * CAMBIO 1: agrega ads insights EN VIVO sobre la ventana elegida (60/90 dias) para
+ * alimentar las tarjetas tipo 'metric' de ads. Devuelve [metrica => {valor, unidad}].
+ *
+ * - Solo actua si $dias != 30 (a 30 dias las tarjetas siguen viniendo de la serie
+ *   persistida: comportamiento previo intacto). Para 30 devuelve [] (vacio).
+ * - NO persiste nada: es una lectura efimera para presentacion.
+ * - Misma escala que la serie persistida (unidad=moneda para spend/cpc/cpm; el ctr
+ *   de Meta ya viene como porcentaje, se usa tal cual con unidad '%').
+ * - No rompe Tanda 2: ante token invalido o respuesta sin datos, devuelve lo que
+ *   tenga (posiblemente []); la pagina ya muestra "Sin datos" en ese caso.
+ */
+function MetricaController_liveAdsWindow(int $clienteId, int $dias): array
+{
+    if ($dias === 30) {
+        return [];
+    }
+    $model = new MetricaModel();
+    $cred = $model->obtenerCredencialesMeta($clienteId);
+    if (!is_array($cred)) {
+        return [];
+    }
+    $token = (string)($cred['access_token'] ?? '');
+    $adAccountId = (string)($cred['ad_account_id'] ?? '');
+    if ($token === '' || $adAccountId === '') {
+        return [];
+    }
+    $meta = new MetaConnector();
+    $valid = $meta->validateToken($token);
+    if (!($valid['success'] ?? false)) {
+        return [];
+    }
+    $timeRange = DashboardController_timeRangeDias($dias);
+    $adsFields = ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'];
+    $ins = $meta->insights($token, $adAccountId, 'last_30d', $adsFields, $timeRange);
+    if (!($ins['success'] ?? false) || empty($ins['data']['data'])) {
+        return [];
+    }
+    $rows = $ins['data']['data'];
+    $currency = '';
+    $acc = $meta->adAccountInfo($token, $adAccountId);
+    if ($acc['success'] ?? false) {
+        $currency = (string)($acc['data']['currency'] ?? '');
+    }
+    $liveAds = [];
+    foreach ($adsFields as $f) {
+        $sum = 0.0; $last = null; $seen = false;
+        foreach ($rows as $r) {
+            if (!isset($r[$f]) || !is_numeric($r[$f])) continue;
+            $num = (float)$r[$f]; $sum += $num; $last = $num; $seen = true;
+        }
+        if (!$seen) continue;
+        $val = $sum > 0 ? $sum : (float)$last;
+        $unidad = '';
+        if (in_array($f, ['spend','cpc','cpm'], true)) { $unidad = $currency; }
+        if ($f === 'ctr') { $unidad = '%'; }
+        $liveAds[$f] = ['valor' => $val, 'unidad' => $unidad];
+    }
+    return $liveAds;
+}
+
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((string)$_SERVER['SCRIPT_FILENAME'])) {
     session_start();
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -112,7 +175,8 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
     if ($method === 'GET' && $action === 'widgets_data') {
         header('Content-Type: application/json');
         $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
-        $dias = isset($_GET['dias']) ? (int)$_GET['dias'] : 30;
+        // CAMBIO 1: rango del selector, whitelist {30,60,90}, default 30.
+        $dias = DashboardController_diasWhitelist($_GET['dias'] ?? 30);
 
         if ($clienteId <= 0) {
             echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
@@ -144,10 +208,17 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         // $metricaModel ya fue instanciado arriba
         $metricasHistoricas = $metricaModel->obtenerMetricasHistoricas($clienteId, $dias);
 
+        // 4. CAMBIO 1: lectura EN VIVO de ads insights sobre la ventana elegida.
+        // Solo cuando el rango NO es el default (60/90): a 30 dias se conserva el
+        // comportamiento previo exacto (tarjetas desde la serie persistida). Esta
+        // lectura NO se persiste: alimenta solo las tarjetas tipo 'metric' de ads.
+        $liveAds = MetricaController_liveAdsWindow($clienteId, $dias);
+
         echo json_encode([
             'success' => true,
             'widgets' => $widgets,
-            'metricasHistoricas' => $metricasHistoricas
+            'metricasHistoricas' => $metricasHistoricas,
+            'liveAds' => $liveAds
         ]);
         exit;
     }

@@ -7,7 +7,9 @@ require_once __DIR__ . '/../../includes/metaErrores.php';
 
 $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
 $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
-$dashData = DashboardController_resumen($clienteId, $agenciaId);
+// CAMBIO 1: rango del selector (whitelist {30,60,90}, default 30).
+$diasRango = DashboardController_diasWhitelist($_GET['dias'] ?? 30);
+$dashData = DashboardController_resumen($clienteId, $agenciaId, $diasRango);
 
 $cliente = is_array($dashData) ? ($dashData['clienteInfo'] ?? null) : null;
 $tieneDashboard = is_array($dashData) ? (bool)($dashData['hasDashboard'] ?? false) : false;
@@ -15,117 +17,10 @@ $dashboardInfo = is_array($dashData) ? ($dashData['dashboardInfo'] ?? null) : nu
 $editMode = isset($_GET['edit']) && (int)$_GET['edit'] === 1;
 $plataformasCliente = is_array($dashData) ? ($dashData['plataformas'] ?? []) : [];
 $widgets = is_array($dashData) ? ($dashData['widgets'] ?? []) : [];
-$metricasBundle = is_array($dashData) ? ($dashData['metricas'] ?? []) : [];
 $errores = is_array($dashData) ? ($dashData['errores'] ?? []) : [];
-$apiErrors = is_array($dashData) ? ($dashData['api_errors'] ?? []) : [];
 $recomMl = is_array($dashData) ? (string)($dashData['recomendacion_ml'] ?? '') : '';
-$insights30d = isset($metricasBundle['5']['insights_30d']) ? $metricasBundle['5']['insights_30d'] : [];
-$sumImpr = 0; foreach ($insights30d as $r) { $sumImpr += (int)($r['impressions'] ?? 0); }
 $visibleWidgets = array_filter($widgets, fn($w) => (int)($w['visible'] ?? 0) === 1);
-$igSelected = false; $fbSelected = false;
-foreach ($visibleWidgets as $w) {
-  $m = (string)$w['metrica_principal'];
-  if ($m === 'instagram_posts') { $igSelected = true; }
-  if ($m === 'page_posts') { $fbSelected = true; }
-}
 
-function fmt_num_k($n) {
-    if ($n === null) return '—';
-    if ($n >= 1000) { return number_format($n/1000, 1, ',', '.') . ' mil'; }
-    return number_format($n, 0, ',', '.');
-}
-
-$adsData = isset($metricasBundle['5']['insights_30d']) ? $metricasBundle['5']['insights_30d'] : [];
-$pageInsights = isset($metricasBundle['5']['page_insights']) ? $metricasBundle['5']['page_insights'] : [];
-$igInsights = isset($metricasBundle['5']['ig_insights']) ? $metricasBundle['5']['ig_insights'] : [];
-$postsIg = isset($metricasBundle['5']['instagram_posts']) ? $postsIg = $metricasBundle['5']['instagram_posts'] : [];
-$postsFb = isset($metricasBundle['5']['page_posts']) ? $metricasBundle['5']['page_posts'] : [];
-$campaigns = isset($metricasBundle['5']['campaigns_activas']) ? $metricasBundle['5']['campaigns_activas'] : [];
-$currency = isset($metricasBundle['5']['currency']) ? (string)$metricasBundle['5']['currency'] : '';
-$prevVals = isset($metricasBundle['5']['prev']) && is_array($metricasBundle['5']['prev']) ? $metricasBundle['5']['prev'] : [];
-
-function metric_ads(array $adsData, string $field) {
-    if (empty($adsData)) return null;
-    $sum = 0; $last = null;
-    foreach ($adsData as $row) {
-        $v = $row[$field] ?? null;
-        if ($v === null) continue;
-        $num = is_numeric($v) ? (float)$v : 0.0;
-        $sum += $num;
-        $last = $num;
-    }
-    return $sum > 0 ? $sum : $last;
-}
-
-function metric_list(array $list, string $name) {
-    foreach ($list as $item) {
-        if ((string)($item['name'] ?? '') !== $name) continue;
-        $values = $item['values'] ?? [];
-        if (!empty($values)) {
-            $last = $values[count($values)-1]['value'] ?? null;
-            if (is_array($last)) { return $last['value'] ?? null; }
-            return $last;
-        }
-    }
-    return null;
-}
-
- 
-
-function metric_period(string $metric): string {
-    $ads = ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'];
-    $page = ['page_impressions','page_engaged_users','page_fans'];
-    $ig = ['ig_impressions','ig_reach','ig_profile_views','ig_follower_count'];
-    if (in_array($metric, $ads, true)) return 'Últimos 30 días';
-    if (in_array($metric, $page, true)) return 'Últimos 28 días';
-    if (in_array($metric, $ig, true)) return 'Diario';
-    if ($metric === 'instagram_posts' || $metric === 'page_posts') return 'Últimos 10 items';
-    return 'N/A';
-}
-
-function api_error_for(array $apiErrors, string $metric): ?string {
-    foreach ($apiErrors as $e) {
-        $m = (string)($e['metric'] ?? '');
-        if ($m !== $metric) continue;
-        $d = $e['detail'] ?? null;
-        if (is_array($d)) {
-            $msg = $d['message'] ?? ($d['error']['message'] ?? null);
-            $type = $d['type'] ?? ($d['error']['type'] ?? null);
-            $code = $d['code'] ?? ($d['error']['code'] ?? null);
-            return $msg ? ($type ? "$type $code: $msg" : (string)$msg) : json_encode($d, JSON_UNESCAPED_UNICODE);
-        }
-        if (is_string($d)) return $d;
-    }
-    return null;
-}
-
-function currency_symbol(string $code): string {
-    $map = ['ARS' => '$', 'USD' => '$', 'EUR' => '€', 'BRL' => 'R$', 'MXN' => '$', 'CLP' => '$'];
-    return $map[strtoupper($code)] ?? (strtoupper($code) !== '' ? strtoupper($code) . ' ' : '$');
-}
-
-function format_value($val, string $metric, string $currency): string {
-    if (is_null($val)) return '—';
-    $num = is_numeric($val) ? (float)$val : null;
-    $isCurrency = in_array($metric, ['spend','cpc','cpm'], true);
-    $isPct = ($metric === 'ctr');
-    $isFloat = ($metric === 'frequency');
-    if ($isCurrency && $num !== null) {
-        return currency_symbol($currency) . number_format($num, 2, ',', '.');
-    }
-    if ($isPct && $num !== null) {
-        return number_format($num * 100, 2, ',', '.') . '%';
-    }
-    if ($isFloat && $num !== null) {
-        return number_format($num, 2, ',', '.');
-    }
-    if ($num !== null) {
-        return number_format($num, 0, ',', '.');
-    }
-    return (string)$val;
-}
-
- 
 // --- Datos de cabecera (presentacion): estado de conexion y ultimo dato ---
 $breadcrumb = ['Clientes', 'Métricas'];
 $metaConectada = false;
@@ -163,11 +58,7 @@ function metricas_rel(?string $fecha): string {
   <?php require_once __DIR__ . '/../templates/sidebar.php'; ?>
   <div class="app-main">
     <?php require __DIR__ . '/../templates/topbar.php'; ?>
-    <main class="app-content metricas-content" id="metricas-root"
-        data-ads='<?= htmlspecialchars(json_encode($adsData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'
-        data-page='<?= htmlspecialchars(json_encode($pageInsights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'
-        data-ig='<?= htmlspecialchars(json_encode($igInsights, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'
-        data-prev='<?= htmlspecialchars(json_encode($prevVals, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), ENT_QUOTES, "UTF-8") ?>'>
+    <main class="app-content metricas-content" id="metricas-root">
     <header class="page-header">
       <div>
         <h1><?= $cliente ? htmlspecialchars((string)$cliente['nombre'], ENT_QUOTES, 'UTF-8') : 'Cliente' ?></h1>
@@ -183,7 +74,12 @@ function metricas_rel(?string $fecha): string {
       </div>
       <div class="page-header-actions">
         <?php if ($tieneDashboard): ?>
-          <span class="badge badge-muted">Últimos 30 días</span>
+          <label for="rango-dias-select" class="sr-only">Rango de fechas</label>
+          <select id="rango-dias-select" class="btn btn-secondary no-global-loading" aria-label="Rango de fechas">
+            <?php foreach ([30, 60, 90] as $opt): ?>
+              <option value="<?= $opt ?>" <?= $diasRango === $opt ? 'selected' : '' ?>>Últimos <?= $opt ?> días</option>
+            <?php endforeach; ?>
+          </select>
           <button type="button" id="personalizar-dashboard-btn" class="btn btn-secondary no-global-loading">
             <i class="bi bi-gear"></i> Personalizar
           </button>

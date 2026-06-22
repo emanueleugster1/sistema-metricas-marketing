@@ -8,6 +8,30 @@ require_once __DIR__ . '/../api/connectors/metaConnector.php';
 require_once __DIR__ . '/../api/connectors/geminiConnector.php';
 require_once __DIR__ . '/../api/ml/RecomendadorML.php';
 
+/**
+ * Selector de rango (CAMBIO 1): normaliza el parametro "dias" del request a un valor
+ * permitido. Default 30 (retrocompatible); whitelist {30,60,90} para no inyectar
+ * ventanas arbitrarias en las llamadas a Meta.
+ */
+function DashboardController_diasWhitelist($raw): int
+{
+    $d = (int)$raw;
+    return in_array($d, [30, 60, 90], true) ? $d : 30;
+}
+
+/**
+ * Traduce "dias" a un time_range {since, until} para ads insights. Para 30 dias
+ * devuelve null: se conserva date_preset='last_30d' (comportamiento EXACTO previo).
+ * Para 60/90 arma la ventana explicita (Meta no tiene preset last_60d).
+ */
+function DashboardController_timeRangeDias(int $dias): ?array
+{
+    if ($dias === 30) {
+        return null;
+    }
+    return ['since' => date('Y-m-d', strtotime('-' . $dias . ' days')), 'until' => date('Y-m-d')];
+}
+
 function DashboardController_buildRecommendations(array $rows, array $featureKeys): array
 {
     // Fix 3: el ML puede lanzar (matriz singular / features colineales). Si falla,
@@ -155,7 +179,7 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
             $val = $valueFromAds($adsData, $m);
             $unidad = '';
             if ($m === 'spend' || $m === 'cpc' || $m === 'cpm') { $unidad = $currency; }
-            if ($m === 'ctr' && is_numeric($val)) { $val = (float)$val * 100.0; $unidad = '%'; }
+            if ($m === 'ctr' && is_numeric($val)) { $unidad = '%'; }
             if (is_numeric($val)) { $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => $m, 'valor' => (float)$val, 'unidad' => $unidad]; }
         }
         foreach ($pageMetrics as $m) {
@@ -191,8 +215,10 @@ function DashboardController_widgetsDisponibles(int $plataformaId): array
     return $allowed;
 }
 
-function DashboardController_resumen(int $clienteId, int $agenciaId): array
+function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias = 30): array
 {
+    $dias = DashboardController_diasWhitelist($dias);
+    $adsTimeRange = DashboardController_timeRangeDias($dias);
     $model = new DashboardModel();
     $clienteModel = new MetricaModel();
     $cliente = $clienteModel->obtenerClientePorId($clienteId);
@@ -225,6 +251,8 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
                 $meta = new MetaConnector();
                 $valid = $meta->validateToken($accessToken);
                 if (!$valid['success']) {
+                    // CAMBIO 2: token invalido -> credencial deja de estar validada.
+                    $clienteModel->marcarValidada($clienteId, 5, false);
                     $errores[] = 'token_meta_invalido';
                     continue;
                 }
@@ -232,8 +260,17 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
                 // Si no tiene ni lectura de ads ni de pagina, no traera nada: avisamos.
                 $permisos = $meta->validatePermissions($accessToken);
                 if (($permisos['usable'] ?? true) === false) {
+                    // CAMBIO 2: permisos insuficientes (resultado definitivo) -> validada=0.
+                    $clienteModel->marcarValidada($clienteId, 5, false);
                     $errores[] = 'permisos_insuficientes';
                     continue;
+                }
+                // CAMBIO 2: el token paso la validacion de permisos de forma concluyente
+                // (success y usable). Marcamos validada=1. Si el resultado fue
+                // 'indeterminado' (la llamada a /me/permissions fallo de forma transitoria),
+                // NO tocamos el estado: Tanda 2 dice "no rompemos tokens que hoy funcionan".
+                if (($permisos['indeterminado'] ?? false) === false && ($permisos['success'] ?? false) === true) {
+                    $clienteModel->marcarValidada($clienteId, 5, true);
                 }
                 $visibleWidgets = array_filter($widgets, fn($w) => (int)$w['visible'] === 1);
                 $needFields = [];
@@ -286,7 +323,7 @@ function DashboardController_resumen(int $clienteId, int $agenciaId): array
                 } else {
                     $fields = !empty($needFields) ? array_keys($needFields) : [];
                     if (!empty($fields) && $adAccountId !== '') {
-                        $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', $fields);
+                        $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', $fields, $adsTimeRange);
                         if ($ins['success']) { $metricas['5']['insights_30d'] = $ins['data']['data'] ?? []; } else { $errores[] = 'insights_error'; $api_errors[] = ['metric' => 'insights_30d', 'detail' => $ins]; }
                     }
                     if ($needPagePosts && $pageId !== '') {

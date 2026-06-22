@@ -104,10 +104,18 @@ class MetaConnector
         return $this->request($act . '/campaigns', $params);
     }
 
-    public function insights(string $accessToken, string $adAccountId, string $datePreset = 'last_30d', array $fields = ['impressions','clicks','spend']): array
+    public function insights(string $accessToken, string $adAccountId, string $datePreset = 'last_30d', array $fields = ['impressions','clicks','spend'], ?array $timeRange = null): array
     {
         $act = $this->normalizeAccountId($adAccountId);
-        $params = ['fields' => implode(',', $fields), 'date_preset' => $datePreset, 'access_token' => $accessToken];
+        $params = ['fields' => implode(',', $fields), 'access_token' => $accessToken];
+        // Selector de rango: si viene un time_range explicito (since/until), tiene
+        // prioridad sobre date_preset. Permite ventanas que Meta no expone como preset
+        // (p.ej. 60 dias: no existe last_60d). Sin time_range, comportamiento original.
+        if ($timeRange !== null && isset($timeRange['since'], $timeRange['until'])) {
+            $params['time_range'] = json_encode(['since' => $timeRange['since'], 'until' => $timeRange['until']]);
+        } else {
+            $params['date_preset'] = $datePreset;
+        }
         return $this->request($act . '/insights', $params);
     }
 
@@ -216,10 +224,12 @@ class MetaConnector
         $resp = $this->request('me/permissions', ['access_token' => $accessToken]);
         if (!($resp['success'] ?? false)) {
             // No determinable: no rompemos tokens que hoy funcionan.
-            return ['success' => false, 'indeterminado' => true, 'usable' => true, 'granted' => [], 'faltantes' => [], 'detail' => $resp];
+            $r = ['success' => false, 'indeterminado' => true, 'usable' => true, 'granted' => [], 'faltantes' => [], 'detail' => $resp];
+            return $r;
         }
         $lista = (isset($resp['data']['data']) && is_array($resp['data']['data'])) ? $resp['data']['data'] : [];
-        return ['success' => true, 'indeterminado' => false] + self::analizarPermisos($lista, $minimos);
+        $r = ['success' => true, 'indeterminado' => false] + self::analizarPermisos($lista, $minimos);
+        return $r;
     }
 
     /**
