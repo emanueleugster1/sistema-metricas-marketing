@@ -292,8 +292,10 @@ function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias =
                     if (in_array($m, $igUserMetrics, true)) { $needIgInsightsFields[$m] = true; }
                 }
                 $metricas['5'] = $metricas['5'] ?? [];
-                $api_errors = [];
                 $fresh = $clienteModel->hayMetricasRecientes($clienteId, 7);
+                // Una sola corrida cuando los datos NO estan frescos: primero la
+                // extraccion/persistencia, despues el fetch en vivo (que alimenta
+                // $errores para el panel). Mismo orden y misma logica de antes.
                 if (!$fresh) {
                     // Fix 2 (Tanda 2): si la extraccion fue rate-limiteada, avisamos
                     // (no se cachea nada parcial; se reintenta en la proxima carga).
@@ -301,73 +303,32 @@ function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias =
                     if (is_array($resExtra) && ($resExtra['rate_limited'] ?? false)) {
                         $errores[] = 'meta_rate_limited';
                     }
-                }
-                $values = [];
-                if ($adAccountId !== '') {
-                    $acc = $meta->adAccountInfo($accessToken, $adAccountId);
-                    if ($acc['success']) {
-                        $metricas['5']['currency'] = (string)($acc['data']['currency'] ?? '');
-                    }
-                }
-                if ($fresh) {
-                    foreach ($visibleWidgets as $w) {
-                        $metric = (string)$w['metrica_principal'];
-                        $row = $clienteModel->obtenerUltimaMetrica($clienteId, 5, $metric);
-                        if ($row) {
-                            $val = $row['valor'] ?? null;
-                            if ($metric === 'ctr' && is_numeric($val)) { $val = ((float)$val) / 100.0; }
-                            if (is_numeric($val)) { $values[$metric] = (float)$val; }
-                            if (in_array($metric, ['spend','cpc','cpm'], true)) { $metricas['5']['currency'] = (string)($row['unidad'] ?? ($metricas['5']['currency'] ?? '')); }
-                        }
-                    }
-                } else {
                     $fields = !empty($needFields) ? array_keys($needFields) : [];
                     if (!empty($fields) && $adAccountId !== '') {
                         $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', $fields, $adsTimeRange);
-                        if ($ins['success']) { $metricas['5']['insights_30d'] = $ins['data']['data'] ?? []; } else { $errores[] = 'insights_error'; $api_errors[] = ['metric' => 'insights_30d', 'detail' => $ins]; }
+                        if ($ins['success']) { $metricas['5']['insights_30d'] = $ins['data']['data'] ?? []; } else { $errores[] = 'insights_error'; }
                     }
                     if ($needPagePosts && $pageId !== '') {
                         $pp = $meta->pagePosts($accessToken, $pageId, 10);
-                        if ($pp['success']) { $metricas['5']['page_posts'] = $pp['data']['data'] ?? []; } else { $errores[] = 'page_posts_error'; $api_errors[] = ['metric' => 'page_posts', 'detail' => $pp]; }
+                        if ($pp['success']) { $metricas['5']['page_posts'] = $pp['data']['data'] ?? []; } else { $errores[] = 'page_posts_error'; }
                     }
                     if (!empty($needPageInsightsFields) && $pageId !== '') {
                         $pis = $meta->pageInsights($accessToken, $pageId, array_keys($needPageInsightsFields), 'days_28');
-                        if ($pis['success']) { $metricas['5']['page_insights'] = $pis['data']['data'] ?? []; } else { $errores[] = 'page_insights_error'; $api_errors[] = ['metric' => 'page_insights', 'detail' => $pis]; }
+                        if ($pis['success']) { $metricas['5']['page_insights'] = $pis['data']['data'] ?? []; } else { $errores[] = 'page_insights_error'; }
                     }
                     if ($needInstagramPosts && $igBusinessId !== '') {
                         $ip = $meta->instagramPosts($accessToken, $igBusinessId, 10);
-                        if ($ip['success']) { $metricas['5']['instagram_posts'] = $ip['data']['data'] ?? []; } else { $errores[] = 'instagram_posts_error'; $api_errors[] = ['metric' => 'instagram_posts', 'detail' => $ip]; }
+                        if ($ip['success']) { $metricas['5']['instagram_posts'] = $ip['data']['data'] ?? []; } else { $errores[] = 'instagram_posts_error'; }
                     }
                     if (!empty($needIgInsightsFields) && $igBusinessId !== '') {
                         $iis = $meta->instagramUserInsights($accessToken, $igBusinessId, array_keys($needIgInsightsFields), 'day');
-                        if ($iis['success']) { $metricas['5']['ig_insights'] = $iis['data']['data'] ?? []; } else { $errores[] = 'ig_insights_error'; $api_errors[] = ['metric' => 'ig_insights', 'detail' => $iis]; }
+                        if ($iis['success']) { $metricas['5']['ig_insights'] = $iis['data']['data'] ?? []; } else { $errores[] = 'ig_insights_error'; }
                     }
                     if ($needCampaigns && $adAccountId !== '') {
                         $camps = $meta->campaigns($accessToken, $adAccountId, 'ACTIVE');
-                        if ($camps['success']) { $metricas['5']['campaigns_activas'] = $camps['data']['data'] ?? []; } else { $errores[] = 'campaigns_error'; $api_errors[] = ['metric' => 'campaigns_activas', 'detail' => $camps]; }
+                        if ($camps['success']) { $metricas['5']['campaigns_activas'] = $camps['data']['data'] ?? []; } else { $errores[] = 'campaigns_error'; }
                     }
                 }
-                if (!empty($api_errors)) { $metricas['5']['api_errors'] = $api_errors; }
-
-                $adsData = $metricas['5']['insights_30d'] ?? [];
-                $pageInsights = $metricas['5']['page_insights'] ?? [];
-                $igInsights = $metricas['5']['ig_insights'] ?? [];
-                $postsIg = $metricas['5']['instagram_posts'] ?? [];
-                $postsFb = $metricas['5']['page_posts'] ?? [];
-                $campaigns = $metricas['5']['campaigns_activas'] ?? [];
-                $currency = (string)($metricas['5']['currency'] ?? '');
-
-                $prevVals = [];
-                foreach ($visibleWidgets as $w) {
-                    $metric = (string)$w['metrica_principal'];
-                    $prev = $clienteModel->obtenerValorAnteriorMetrica($clienteId, 5, $metric);
-                    if ($prev !== null) {
-                        if ($metric === 'ctr') { $prev = $prev / 100.0; }
-                    }
-                    $prevVals[$metric] = $prev;
-                }
-                if (!empty($prevVals)) { $metricas['5']['prev'] = $prevVals; }
-                if (!empty($values)) { $metricas['5']['values'] = $values; }
             }
         }
     }
