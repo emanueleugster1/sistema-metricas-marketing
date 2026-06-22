@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/../models/dashboardResumenModel.php';
+require_once __DIR__ . '/../models/inicioModel.php';
 
 /**
  * Arma el resumen del panel de inicio para un usuario de agencia.
@@ -9,7 +9,7 @@ require_once __DIR__ . '/../models/dashboardResumenModel.php';
  */
 function InicioController_resumen(int $agenciaId): array
 {
-    $model = new DashboardResumenModel();
+    $model = new InicioModel();
     return [
         'kpis'      => $model->kpis($agenciaId),
         'atencion'  => $model->clientesRequierenAtencion($agenciaId, 5),

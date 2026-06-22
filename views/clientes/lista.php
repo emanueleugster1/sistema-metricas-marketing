@@ -59,7 +59,7 @@ function lista_tiempo_relativo(?string $fecha): string
             <i class="bi bi-search"></i>
             <input id="cliente-search" class="search-input" type="text" placeholder="Buscar cliente" aria-label="Buscar cliente por nombre" value="<?= htmlspecialchars((string)($q ?? ''), ENT_QUOTES, 'UTF-8') ?>">
           </div>
-          <a class="btn btn-primary" href="/clientes/create"><i class="bi bi-plus-lg"></i> Nuevo cliente</a>
+          <a class="btn btn-primary" href="/clientes/crear"><i class="bi bi-plus-lg"></i> Nuevo cliente</a>
         </div>
       </header>
 
@@ -68,7 +68,7 @@ function lista_tiempo_relativo(?string $fecha): string
           <i class="bi bi-people empty-icon"></i>
           <p><?= $q ? 'No hay clientes que coincidan con la búsqueda.' : 'Todavía no hay clientes cargados.' ?></p>
           <?php if (!$q): ?>
-            <a class="btn btn-primary" href="/clientes/create"><i class="bi bi-plus-lg"></i> Agregar el primero</a>
+            <a class="btn btn-primary" href="/clientes/crear"><i class="bi bi-plus-lg"></i> Agregar el primero</a>
           <?php endif; ?>
         </div>
       <?php else: ?>

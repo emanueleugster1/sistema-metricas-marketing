@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../config/databaseConfig.php';
 require_once __DIR__ . '/../models/usuarioModel.php';
-require_once __DIR__ . '/../includes/roleCheck.php';
+require_once __DIR__ . '/../includes/rolCheck.php';
 require_once __DIR__ . '/../includes/passwordHelper.php';
 
 /*
@@ -54,25 +54,25 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         if ($nombre === '' || $email === '') {
             $_SESSION['usuarios_error'] = 'Nombre y email son obligatorios.';
             $_SESSION['usuarios_old'] = ['nombre' => $nombre, 'email' => $email, 'rol_id' => $rolId];
-            header('Location: /usuarios/create');
+            header('Location: /usuarios/crear');
             exit;
         }
         if (!validarPassword($password)) {
             $_SESSION['usuarios_error'] = 'La contraseña debe tener entre 8 y 20 caracteres, con mayúscula, minúscula, número y carácter especial.';
             $_SESSION['usuarios_old'] = ['nombre' => $nombre, 'email' => $email, 'rol_id' => $rolId];
-            header('Location: /usuarios/create');
+            header('Location: /usuarios/crear');
             exit;
         }
         if (!in_array($rolId, $rolesValidos, true)) {
             $_SESSION['usuarios_error'] = 'Rol inválido.';
             $_SESSION['usuarios_old'] = ['nombre' => $nombre, 'email' => $email, 'rol_id' => 0];
-            header('Location: /usuarios/create');
+            header('Location: /usuarios/crear');
             exit;
         }
         if ($model->obtenerPorEmail($email) !== null) {
             $_SESSION['usuarios_error'] = 'Ya existe un usuario con ese email.';
             $_SESSION['usuarios_old'] = ['nombre' => $nombre, 'email' => $email, 'rol_id' => $rolId];
-            header('Location: /usuarios/create');
+            header('Location: /usuarios/crear');
             exit;
         }
 
@@ -84,7 +84,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         }
         $_SESSION['usuarios_error'] = 'No se pudo crear el usuario.';
         $_SESSION['usuarios_old'] = ['nombre' => $nombre, 'email' => $email, 'rol_id' => $rolId];
-        header('Location: /usuarios/create');
+        header('Location: /usuarios/crear');
         exit;
     }
 

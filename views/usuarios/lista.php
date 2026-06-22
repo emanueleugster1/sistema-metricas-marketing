@@ -2,7 +2,7 @@
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
-require_once __DIR__ . '/../../includes/roleCheck.php';
+require_once __DIR__ . '/../../includes/rolCheck.php';
 requerirAdministrador();
 require_once __DIR__ . '/../../controllers/usuarioController.php';
 
@@ -43,7 +43,7 @@ $breadcrumb = ['Usuarios'];
           <p class="page-subtitle"><?= $total ?> <?= $total === 1 ? 'usuario' : 'usuarios' ?> · <?= $activos ?> activos</p>
         </div>
         <div class="page-header-actions">
-          <a class="btn btn-primary" href="/usuarios/create"><i class="bi bi-plus-lg"></i> Nuevo usuario</a>
+          <a class="btn btn-primary" href="/usuarios/crear"><i class="bi bi-plus-lg"></i> Nuevo usuario</a>
         </div>
       </header>
 

@@ -8,7 +8,7 @@ require_once __DIR__ . '/../config/databaseConfig.php';
  * Todas filtran por agencia_id (pertenencia por agencia) y usan prepared
  * statements. Son COUNT / JOIN / listados cortos, sin logica de negocio.
  */
-final class DashboardResumenModel
+final class InicioModel
 {
     private PDO $db;
 

@@ -58,11 +58,11 @@ $routes = [
     ['GET', '#^/?$#',                         'dashboard/inicio.php',  []],
     ['GET', '#^/dashboard/?$#',               'dashboard/inicio.php',  []],
     ['GET', '#^/clientes/lista/?$#',          'clientes/lista.php',    []],
-    ['GET', '#^/clientes/create/?$#',         'clientes/create.php',   []],
+    ['GET', '#^/clientes/crear/?$#',          'clientes/crear.php',    []],
     ['GET', '#^/clientes/editar/(\d+)/?$#',   'clientes/editar.php',   ['cliente_id']],
     ['GET', '#^/clientes/metricas/(\d+)/?$#', 'clientes/metricas.php', ['cliente_id']],
     ['GET', '#^/usuarios/lista/?$#',          'usuarios/lista.php',    []],
-    ['GET', '#^/usuarios/create/?$#',         'usuarios/create.php',   []],
+    ['GET', '#^/usuarios/crear/?$#',          'usuarios/crear.php',    []],
     ['GET', '#^/usuarios/editar/(\d+)/?$#',   'usuarios/editar.php',   ['id']],
 ];
 
