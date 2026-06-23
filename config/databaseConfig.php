@@ -54,6 +54,21 @@ final class Database
     }
 
     /**
+     * Lee una variable de entorno REQUERIDA (de .env o del entorno del proceso) y
+     * lanza si falta o esta vacia. Mismo criterio que CREDENCIALES_KEY en
+     * credencialesCifrado.php: el sistema se niega a arrancar sin configuracion,
+     * en vez de caer a credenciales por defecto hardcodeadas.
+     */
+    private static function requerirEnv(array $env, string $clave): string
+    {
+        $valor = (string)($env[$clave] ?? getenv($clave) ?: '');
+        if ($valor === '') {
+            throw new RuntimeException('Falta la variable ' . $clave . ' en el entorno (.env): no se puede conectar a la base de datos.');
+        }
+        return $valor;
+    }
+
+    /**
      * Inicializa la conexión PDO con parámetros seguros y consistentes.
      */
     private function __construct()
@@ -61,10 +76,12 @@ final class Database
         $envPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
         $env = _readEnvFile($envPath);
         $this->config = [
-            'DB_HOST' => $env['DB_HOST'] ?? getenv('DB_HOST') ?: 'localhost',
-            'DB_DATABASE' => $env['DB_DATABASE'] ?? getenv('DB_DATABASE') ?: 'sistema_metricas_marketing',
-            'DB_USERNAME' => $env['DB_USERNAME'] ?? getenv('DB_USERNAME') ?: 'root',
-            'DB_PASSWORD' => $env['DB_PASSWORD'] ?? getenv('DB_PASSWORD') ?: 'coupon123',
+            // Credenciales: SIN default hardcodeado. Si falta cualquiera, se lanza excepcion.
+            'DB_HOST' => self::requerirEnv($env, 'DB_HOST'),
+            'DB_DATABASE' => self::requerirEnv($env, 'DB_DATABASE'),
+            'DB_USERNAME' => self::requerirEnv($env, 'DB_USERNAME'),
+            'DB_PASSWORD' => self::requerirEnv($env, 'DB_PASSWORD'),
+            // Charset NO es una credencial: default no sensible aceptable.
             'DB_CHARSET' => $env['DB_CHARSET'] ?? getenv('DB_CHARSET') ?: 'utf8mb4',
         ];
 

@@ -30,7 +30,7 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
 
 ## Stack Tecnológico
 - Backend: PHP 8+ (MVC vanilla), cURL para APIs REST.
-- Base de Datos: MySQL/MariaDB (utf8mb4), 10 tablas principales.
+- Base de Datos: MariaDB 10.5 (utf8mb4), 10 tablas principales.
 - Frontend: HTML5, CSS3, JavaScript ES6+, Bootstrap 5, Chart.js para visualizaciones.
 - IA/ML: Gemini Flash 2.5 para insights; `php-ml` para análisis predictivo y recomendaciones.
 
@@ -76,7 +76,7 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
 
 ## Instalación Local
 1. Clonar el repositorio: `git clone https://github.com/emanueleugster1/sistema-metricas-marketing`
-2. Crear base de datos local (MySQL/MariaDB):
+2. Crear base de datos local (MariaDB 10.5):
    - Ejecutar `database/create_database_metricas.sql` o usar `database/install.php`.
 3. Configurar conexión en `config/databaseConfig.php` con tus credenciales locales.
 4. Servir el proyecto:
@@ -95,7 +95,7 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
 3. Acceder a la aplicación:
    - `http://localhost/views/auth/login.php`
 4. Base de datos:
-   - MySQL queda disponible en `localhost:3306` (usuario: `metrics_user`, password: `metrics_pass`).
+   - MariaDB queda disponible en `localhost:3306` (usuario: `metrics_user`, password: `metrics_pass`).
 5. Logs y diagnóstico:
    - `docker compose logs -f web db`
 6. Reinicio/limpieza (opcional):
