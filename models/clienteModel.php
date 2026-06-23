@@ -97,21 +97,6 @@ class ClienteModel
         return $row !== false ? $row : null;
     }
 
-    public function crear(int $usuarioId, int $agenciaId, string $nombre, ?string $sector, bool $activo = true): bool
-    {
-        // usuario_id queda como creador; la pertenencia es por agencia_id.
-        $sql = 'INSERT INTO clientes (usuario_id, agencia_id, nombre, sector, activo, fecha_creacion, fecha_actualizacion) VALUES (?, ?, ?, ?, ?, NOW(), NOW())';
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$usuarioId, $agenciaId, $nombre, $sector, $activo ? 1 : 0]);
-    }
-
-    public function actualizar(int $id, int $agenciaId, string $nombre, ?string $sector, bool $activo): bool
-    {
-        $sql = 'UPDATE clientes SET nombre = ?, sector = ?, activo = ?, fecha_actualizacion = NOW() WHERE id = ? AND agencia_id = ?';
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$nombre, $sector, $activo ? 1 : 0, $id, $agenciaId]);
-    }
-
     public function eliminar(int $id, int $agenciaId): bool
     {
         $sql = 'DELETE FROM clientes WHERE id = ? AND agencia_id = ?';

@@ -103,59 +103,6 @@ final class MetricaModel
         return (bool)$stmt->fetchColumn();
     }
 
-    public function obtenerValorAnteriorMetrica(int $clienteId, int $plataformaId, string $nombreMetrica): ?float
-    {
-        $sql = 'SELECT valor
-                FROM metricas
-                WHERE cliente_id = ? AND plataforma_id = ? AND nombre_metrica = ?
-                ORDER BY fecha_metrica DESC, id DESC
-                LIMIT 1 OFFSET 1';
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$clienteId, $plataformaId, $nombreMetrica]);
-        $row = $stmt->fetch();
-        if (!$row) { return null; }
-        $val = $row['valor'] ?? null;
-        return is_numeric($val) ? (float)$val : null;
-    }
-
-    public function obtenerUltimaMetrica(int $clienteId, int $plataformaId, string $nombreMetrica): ?array
-    {
-        $sql = 'SELECT id, cliente_id, plataforma_id, fecha_metrica, nombre_metrica, valor, unidad, fecha_extraccion, fecha_creacion
-                FROM metricas
-                WHERE cliente_id = ? AND plataforma_id = ? AND nombre_metrica = ?
-                ORDER BY fecha_metrica DESC, id DESC
-                LIMIT 1';
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$clienteId, $plataformaId, $nombreMetrica]);
-        $row = $stmt->fetch();
-        return $row ?: null;
-    }
-
-    public function guardarMetricas(int $clienteId, array $metricas): bool
-    {
-        if (empty($metricas)) return true;
-        $sql = 'INSERT INTO metricas (cliente_id, plataforma_id, fecha_metrica, nombre_metrica, valor, unidad, fecha_creacion)
-                VALUES (?, 5, ?, ?, ?, ?, NOW())';
-        $stmt = $this->db->prepare($sql);
-        try {
-            $this->db->beginTransaction();
-            foreach ($metricas as $m) {
-                $fecha = isset($m['fecha_metrica']) ? (string)$m['fecha_metrica'] : date('Y-m-d');
-                $nombre = (string)($m['nombre_metrica'] ?? '');
-                $valor = (float)($m['valor'] ?? 0);
-                $unidad = isset($m['unidad']) ? (string)$m['unidad'] : '';
-                if ($nombre === '') continue;
-                $stmt->execute([$clienteId, $fecha, $nombre, $valor, $unidad]);
-            }
-            $this->db->commit();
-            return true;
-        } catch (Throwable $e) {
-            error_log($e->getMessage());
-            if ($this->db->inTransaction()) $this->db->rollBack();
-            return false;
-        }
-    }
-
     public function guardarMetricasSiNoRecientes(int $clienteId, array $metricas): bool
     {
         if (empty($metricas)) return true;
