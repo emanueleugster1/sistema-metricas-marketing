@@ -27,7 +27,7 @@
       <?php require __DIR__ . '/../templates/cliente_form.php'; ?>
     </main>
   </div>
-  <script src="../../assets/js/clientes/cliente_form.js?v=<?= time() ?>"></script>
-  <script src="../../assets/js/clientes/create.js?v=<?= time() ?>"></script>
+  <script src="../../assets/js/clientes/clienteForm.js?v=<?= time() ?>"></script>
+  <script src="../../assets/js/clientes/crear.js?v=<?= time() ?>"></script>
 </body>
 </html>

@@ -82,6 +82,6 @@
 
     </main>
   </div>
-  <script src="../../assets/js/usuarios/create.js"></script>
+  <script src="../../assets/js/usuarios/crear.js"></script>
 </body>
 </html>

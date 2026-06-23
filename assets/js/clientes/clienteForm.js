@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('Script cliente_form.js cargado 🚀');
+  console.log('Script clienteForm.js cargado 🚀');
   const checkboxes = document.querySelectorAll('.plataformas-list input[type="checkbox"]');
   const metaCheckbox = document.querySelector('#plataforma-meta-checkbox');
   const metaWrap = document.querySelector('#meta-detect-wrap');

@@ -6,7 +6,7 @@ require_once __DIR__ . '/../models/dashboardModel.php';
 require_once __DIR__ . '/../models/metricaModel.php';
 require_once __DIR__ . '/../api/connectors/metaConnector.php';
 require_once __DIR__ . '/../api/connectors/geminiConnector.php';
-require_once __DIR__ . '/../api/ml/RecomendadorML.php';
+require_once __DIR__ . '/../api/ml/recomendadorML.php';
 
 /**
  * Selector de rango (CAMBIO 1): normaliza el parametro "dias" del request a un valor
