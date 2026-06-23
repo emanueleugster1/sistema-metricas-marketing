@@ -78,7 +78,7 @@ function MetricaController_obtenerResumen(int $clienteId, int $agenciaId, int $d
     $historicas = $model->obtenerMetricasHistoricas($clienteId, dias: 30);
     return [
         'success' => true,
-        'clienteInfo' => $cliente,
+        'infoCliente' => $cliente,
         'metricasReales' => $metricasReales,
         'metricasHistoricas' => $historicas,
         'errores' => $errores,
@@ -163,15 +163,15 @@ function MetricaController_paginaMetricas(): void
     // Llamada UNICA (efectos de escritura): extrae de Meta y persiste si corresponde.
     $dashData = DashboardController_obtenerResumen($clienteId, $agenciaId, $diasRango);
 
-    $cliente = is_array($dashData) ? ($dashData['clienteInfo'] ?? null) : null;
-    $tieneDashboard = is_array($dashData) ? (bool)($dashData['hasDashboard'] ?? false) : false;
-    $dashboardInfo = is_array($dashData) ? ($dashData['dashboardInfo'] ?? null) : null;
+    $cliente = is_array($dashData) ? ($dashData['infoCliente'] ?? null) : null;
+    $tieneDashboard = is_array($dashData) ? (bool)($dashData['tieneDashboard'] ?? false) : false;
+    $infoDashboard = is_array($dashData) ? ($dashData['infoDashboard'] ?? null) : null;
     $esEdicion = isset($_GET['edit']) && (int)$_GET['edit'] === 1;
     $plataformasCliente = is_array($dashData) ? ($dashData['plataformas'] ?? []) : [];
     $widgets = is_array($dashData) ? ($dashData['widgets'] ?? []) : [];
     $errores = is_array($dashData) ? ($dashData['errores'] ?? []) : [];
     $recomMl = is_array($dashData) ? (string)($dashData['recomendacion_ml'] ?? '') : '';
-    $visibleWidgets = array_filter($widgets, fn($w) => (int)($w['visible'] ?? 0) === 1);
+    $widgetsVisibles = array_filter($widgets, fn($w) => (int)($w['visible'] ?? 0) === 1);
 
     // Cabecera (presentacion): estado de conexion y ultimo dato.
     $metaConectada = false;
@@ -194,14 +194,14 @@ function MetricaController_paginaMetricas(): void
         $widgetsPorPlataforma[$plat['nombre']] = DashboardController_obtenerWidgetsDisponibles($pid);
     }
     if ($tieneDashboard) {
-        $mode = 'edit';
-        $formAction = '/controllers/dashboardController.php?action=actualizar_widgets';
-        $widgetsVisiblesIds = array_map(fn($w) => (int)$w['widget_id'], $widgets);
+        $modo = 'edit';
+        $accionForm = '/controllers/dashboardController.php?action=actualizar_widgets';
+        $idsWidgetsVisibles = array_map(fn($w) => (int)$w['widget_id'], $widgets);
         $clienteNombre = '';
     } else {
-        $mode = 'create';
-        $formAction = '/controllers/dashboardController.php?action=crear';
-        $widgetsVisiblesIds = [];
+        $modo = 'create';
+        $accionForm = '/controllers/dashboardController.php?action=crear';
+        $idsWidgetsVisibles = [];
         $clienteNombre = $cliente ? (string)$cliente['nombre'] : '';
     }
 
@@ -211,22 +211,22 @@ function MetricaController_paginaMetricas(): void
         'diasRango'            => $diasRango,
         'cliente'              => $cliente,
         'tieneDashboard'       => $tieneDashboard,
-        'dashboardInfo'        => $dashboardInfo,
+        'infoDashboard'        => $infoDashboard,
         'esEdicion'             => $esEdicion,
         'plataformasCliente'   => $plataformasCliente,
         'widgets'              => $widgets,
         'errores'              => $errores,
         'recomMl'              => $recomMl,
-        'visibleWidgets'       => $visibleWidgets,
+        'widgetsVisibles'       => $widgetsVisibles,
         'metaConectada'        => $metaConectada,
         'ultimaFecha'          => $ultimaFecha,
         'erroresMeta'          => $erroresMeta,
         'ultimaRec'            => $ultimaRec,
         'recomContent'         => $recomContent,
         'widgetsPorPlataforma' => $widgetsPorPlataforma,
-        'mode'                 => $mode,
-        'formAction'           => $formAction,
-        'widgetsVisiblesIds'   => $widgetsVisiblesIds,
+        'modo'                 => $modo,
+        'accionForm'           => $accionForm,
+        'idsWidgetsVisibles'   => $idsWidgetsVisibles,
         'clienteNombre'        => $clienteNombre,
         'breadcrumb'           => ['Clientes', 'Métricas'],
     ]);

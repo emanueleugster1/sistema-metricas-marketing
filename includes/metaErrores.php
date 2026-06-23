@@ -20,7 +20,7 @@ function traducirErroresMeta(array $codigos): array
         'token_meta_faltante'     => 'Falta el token de acceso de Meta.',
         'token_meta_invalido'     => 'El token de Meta no es válido o expiró. Volvé a conectarlo.',
         'permisos_insuficientes'  => 'El token de Meta no tiene permisos suficientes para leer datos (se necesita al menos lectura de anuncios o de página). Reconectá la cuenta otorgando los permisos.',
-        'meta_rate_limited'       => 'Meta limitó temporalmente las solicitudes. Los datos se completarán en el próximo intento, en unos minutos.',
+        'metaLimitadoPorTasa'       => 'Meta limitó temporalmente las solicitudes. Los datos se completarán en el próximo intento, en unos minutos.',
         'insights_error'          => 'No se pudieron obtener las métricas de anuncios.',
         'page_posts_error'        => 'No se pudieron obtener las publicaciones de Facebook.',
         'page_insights_error'     => 'No se pudieron obtener las estadísticas de la página.',

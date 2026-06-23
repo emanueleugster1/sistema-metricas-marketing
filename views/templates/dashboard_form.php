@@ -3,16 +3,16 @@
  * Template para el formulario de Dashboard (Crear o Personalizar)
  * 
  * Variables esperadas:
- * $mode : 'create' | 'edit'
- * $formAction : string
+ * $modo : 'create' | 'edit'
+ * $accionForm : string
  * $widgetsPorPlataforma : array ( [ 'Nombre Plataforma' => [widgets...] ] )
- * $widgetsVisiblesIds : array (IDs de widgets seleccionados)
- * $dashboardInfo : array|null (Info del dashboard si edit)
+ * $idsWidgetsVisibles : array (IDs de widgets seleccionados)
+ * $infoDashboard : array|null (Info del dashboard si edit)
  * $clienteId : int (Solo para create)
  * $clienteNombre : string (Para prellenar nombre en create)
  */
 
-$esCreacion = ($mode === 'create');
+$esCreacion = ($modo === 'create');
 $checkboxName = $esCreacion ? 'widgets_ids[]' : 'widgets[]';
 $submitLabel = $esCreacion ? 'Crear Dashboard' : 'Guardar Cambios';
 $modalTitle = $esCreacion ? 'Crear Dashboard' : 'Personalizar Dashboard';
@@ -29,7 +29,7 @@ $modalTitle = $esCreacion ? 'Crear Dashboard' : 'Personalizar Dashboard';
         </div>
         
         <!-- Formulario -->
-        <form id="dashboard-form" method="POST" action="<?= htmlspecialchars($formAction) ?>">
+        <form id="dashboard-form" method="POST" action="<?= htmlspecialchars($accionForm) ?>">
             
             <?php if ($esCreacion): ?>
                 <input type="hidden" name="cliente_id" value="<?= (int)$clienteId ?>">
@@ -41,7 +41,7 @@ $modalTitle = $esCreacion ? 'Crear Dashboard' : 'Personalizar Dashboard';
                            value="<?= htmlspecialchars($clienteNombre ?? '') ?>" required>
                 </div>
             <?php else: ?>
-                <input type="hidden" name="dashboard_id" value="<?= htmlspecialchars($dashboardInfo['id'] ?? '') ?>">
+                <input type="hidden" name="dashboard_id" value="<?= htmlspecialchars($infoDashboard['id'] ?? '') ?>">
             <?php endif; ?>
             
             <!-- Secciones de Widgets -->
@@ -63,7 +63,7 @@ $modalTitle = $esCreacion ? 'Crear Dashboard' : 'Personalizar Dashboard';
                                    name="<?= $checkboxName ?>" 
                                    value="<?= htmlspecialchars($widget['id']) ?>"
                                    id="widget-<?= htmlspecialchars($widget['id']) ?>"
-                                   <?= in_array($widget['id'], $widgetsVisiblesIds ?? []) ? 'checked' : '' ?>>
+                                   <?= in_array($widget['id'], $idsWidgetsVisibles ?? []) ? 'checked' : '' ?>>
                             <label class="form-check-label" for="widget-<?= htmlspecialchars($widget['id']) ?>">
                                 <strong><?= htmlspecialchars($widget['nombre']) ?></strong><br>
                                 <small class="text-muted"><?= htmlspecialchars($widget['descripcion']) ?></small>

@@ -56,7 +56,7 @@ function DashboardController_generarRecomendaciones(array $rows, array $featureK
             $aiOk = $aiMl !== '';
         }
     }
-    return ['ml' => (string)$mlText, 'ai_ml' => $aiMl, 'ai_ok' => $aiOk];
+    return ['datosMl' => (string)$mlText, 'mlGenerado' => $aiMl, 'geminiRespondio' => $aiOk];
 }
 
 function DashboardController_actualizarWidgets(int $dashboardId, array $widgetsIds, int $agenciaId): array
@@ -89,11 +89,11 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
     $mm = new MetricaModel();
     $cliente = $mm->obtenerClientePorId($clienteId);
     if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
-        return ['success' => false, 'inserted' => 0];
+        return ['success' => false, 'insertados' => 0];
     }
     $model = new DashboardModel();
     $plataformas = $model->obtenerPlataformasVinculadas($clienteId);
-    $inserted = 0;
+    $insertados = 0;
     foreach ($plataformas as $plat) {
         $pid = (int)$plat['plataforma_id'];
         if ($pid !== 5) continue;
@@ -155,7 +155,7 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
         // Fix 2: corrida envenenada por rate-limit/transitorio -> NO persistir lote parcial.
         // Asi hayMetricasRecientes() sigue false y la proxima carga reintenta pronto.
         if ($huboTransitorio) {
-            return ['success' => false, 'inserted' => 0, 'rate_limited' => true];
+            return ['success' => false, 'insertados' => 0, 'limitadoPorTasa' => true];
         }
         $nowDate = date('Y-m-d');
         $valueFromAds = function(array $data, string $field) {
@@ -196,10 +196,10 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
         $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => 'campaigns_activas', 'valor' => is_array($campaigns) ? (float)count($campaigns) : 0.0, 'unidad' => ''];
         if (!empty($toPersist)) {
             $ok = $mm->guardarMetricasSiNoRecientes($clienteId, $toPersist);
-            if ($ok) { $inserted += count($toPersist); }
+            if ($ok) { $insertados += count($toPersist); }
         }
     }
-    return ['success' => true, 'inserted' => $inserted];
+    return ['success' => true, 'insertados' => $insertados];
 }
 
 function DashboardController_obtenerWidgetsDisponibles(int $plataformaId): array
@@ -300,8 +300,8 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
                     // Fix 2 (Tanda 2): si la extraccion fue rate-limiteada, avisamos
                     // (no se cachea nada parcial; se reintenta en la proxima carga).
                     $resExtra = DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
-                    if (is_array($resExtra) && ($resExtra['rate_limited'] ?? false)) {
-                        $errores[] = 'meta_rate_limited';
+                    if (is_array($resExtra) && ($resExtra['limitadoPorTasa'] ?? false)) {
+                        $errores[] = 'metaLimitadoPorTasa';
                     }
                     $fields = !empty($needFields) ? array_keys($needFields) : [];
                     if (!empty($fields) && $adAccountId !== '') {
@@ -362,13 +362,13 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
             $filtered = !empty($selected) ? array_values(array_filter($allRows, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
             if (!empty($filtered)) {
                 $rec = DashboardController_generarRecomendaciones($filtered, $selected);
-                $traduccionAi = (string)$rec['ml'];
+                $traduccionAi = (string)$rec['datosMl'];
 
                 // Fix 1: solo persistir/cachear si la IA respondio bien y no vacio.
                 // Un fallo transitorio (429, bloqueo) NO contamina el cache: se deja
                 // intacta la ultima recomendacion valida previa (si existe).
-                if (($rec['ai_ok'] ?? false) === true && (string)$rec['ai_ml'] !== '') {
-                    $recomMl = (string)$rec['ai_ml'];
+                if (($rec['geminiRespondio'] ?? false) === true && (string)$rec['mlGenerado'] !== '') {
+                    $recomMl = (string)$rec['mlGenerado'];
                     $clienteModel->insertarRecomendacionML($clienteId, $recomMl);
                     // Actualizar referencia
                     $ultimaRec = $clienteModel->obtenerUltimaRecomendacionML($clienteId);
@@ -378,14 +378,14 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
     }
     return [
         'success' => true,
-        'clienteInfo' => $cliente,
-        'dashboardInfo' => $dashboard,
-        'hasDashboard' => $tieneDashboard,
+        'infoCliente' => $cliente,
+        'infoDashboard' => $dashboard,
+        'tieneDashboard' => $tieneDashboard,
         'plataformas' => $plataformas,
         'widgets' => $widgets,
         'metricas' => $metricas,
         'errores' => $errores,
-        'recomendaciones_ai' => $traduccionAi,
+        'recomendacionesIa' => $traduccionAi,
         'recomendacion_ml' => $recomMl,
         'ultima_recomendacion_ml' => $ultimaRec,
     ];
@@ -502,8 +502,8 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             $filtered = !empty($selected) ? array_values(array_filter($rowsNow, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
             if (!empty($filtered)) {
                 $rec = DashboardController_generarRecomendaciones($filtered, $selected);
-                $contenido = (string)$rec['ml'];
-                if ($contenido === '' && (string)$rec['ai_ml'] !== '') { $contenido = (string)$rec['ai_ml']; }
+                $contenido = (string)$rec['datosMl'];
+                if ($contenido === '' && (string)$rec['mlGenerado'] !== '') { $contenido = (string)$rec['mlGenerado']; }
             }
         }
         // Fix 4: no persistir recomendaciones vacias (resetean el cache de 7 dias
@@ -516,7 +516,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             header('Location: /clientes/metricas/' . $clienteId);
             exit;
         }
-        echo json_encode(['success' => (bool)$res['success'], 'inserted' => (int)$res['inserted']]);
+        echo json_encode(['success' => (bool)$res['success'], 'insertados' => (int)$res['insertados']]);
         exit;
     }
 

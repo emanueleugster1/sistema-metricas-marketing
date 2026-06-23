@@ -1,7 +1,7 @@
 <?php
 /*
  Vista pasiva. Recibe del controlador (ClienteController_paginaEditar via renderizarVista):
-   $agenciaId, $clienteId, $error, $errorMsg, $cliente, $plataformas,
+   $agenciaId, $clienteId, $error, $mensajeError, $cliente, $plataformas,
    $camposPorPlataforma, $credencialesMap, $validadaMap, $esEdicion, $breadcrumb.
    El template cliente_form.php consume estas mismas variables.
 */

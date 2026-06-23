@@ -20,8 +20,8 @@ $validadaMap = isset($validadaMap) && is_array($validadaMap) ? $validadaMap : []
   <a class="btn btn-secondary" href="/clientes/lista"><i class="bi bi-arrow-left"></i> Volver</a>
 </header>
 
-<?php if (!empty($errorMsg)): ?>
-  <div class="alert alert-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($errorMsg, ENT_QUOTES, 'UTF-8') ?></div>
+<?php if (!empty($mensajeError)): ?>
+  <div class="alert alert-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($mensajeError, ENT_QUOTES, 'UTF-8') ?></div>
 <?php endif; ?>
 
 <form id="cliente-form" method="post" action="<?= $actionUrl ?>">

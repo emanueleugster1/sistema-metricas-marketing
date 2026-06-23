@@ -1,7 +1,7 @@
 <?php
 /*
  Vista pasiva. Recibe del controlador (UsuarioController_paginaLista via renderizarVista):
-   $usuarios, $miId, $total, $activos, $flashInfo, $flashError, $breadcrumb.
+   $usuarios, $miId, $total, $activos, $avisoInfo, $avisoError, $breadcrumb.
    El guard de administrador se ejecuta en el controlador.
 */
 ?>
@@ -34,11 +34,11 @@
         </div>
       </header>
 
-      <?php if ($flashInfo !== ''): ?>
-        <div class="alert alert-success"><i class="bi bi-check-circle"></i> <?= htmlspecialchars($flashInfo, ENT_QUOTES, 'UTF-8') ?></div>
+      <?php if ($avisoInfo !== ''): ?>
+        <div class="alert alert-success"><i class="bi bi-check-circle"></i> <?= htmlspecialchars($avisoInfo, ENT_QUOTES, 'UTF-8') ?></div>
       <?php endif; ?>
-      <?php if ($flashError !== ''): ?>
-        <div class="alert alert-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($flashError, ENT_QUOTES, 'UTF-8') ?></div>
+      <?php if ($avisoError !== ''): ?>
+        <div class="alert alert-error"><i class="bi bi-exclamation-circle"></i> <?= htmlspecialchars($avisoError, ENT_QUOTES, 'UTF-8') ?></div>
       <?php endif; ?>
 
       <div class="table-wrap">

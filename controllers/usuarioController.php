@@ -42,8 +42,8 @@ function UsuarioController_paginaLista(): void
     foreach ($usuarios as $u) {
         if ((int)$u['activo'] === 1) { $activos++; }
     }
-    $flashInfo = isset($_SESSION['usuarios_info']) ? (string)$_SESSION['usuarios_info'] : '';
-    $flashError = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
+    $avisoInfo = isset($_SESSION['usuarios_info']) ? (string)$_SESSION['usuarios_info'] : '';
+    $avisoError = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
     unset($_SESSION['usuarios_info'], $_SESSION['usuarios_error']);
 
     renderizarVista('usuarios/lista.php', [
@@ -51,8 +51,8 @@ function UsuarioController_paginaLista(): void
         'miId'       => $miId,
         'total'      => $total,
         'activos'    => $activos,
-        'flashInfo'  => $flashInfo,
-        'flashError' => $flashError,
+        'avisoInfo'  => $avisoInfo,
+        'avisoError' => $avisoError,
         'breadcrumb' => ['Usuarios'],
     ]);
 }
@@ -69,9 +69,9 @@ function UsuarioController_paginaCrear(): void
     renderizarVista('usuarios/crear.php', [
         'roles'      => $roles,
         'error'      => $error,
-        'nombreVal'  => (string)($old['nombre'] ?? ''),
-        'emailVal'   => (string)($old['email'] ?? ''),
-        'rolSel'     => (int)($old['rol_id'] ?? 0),
+        'nombreValor'  => (string)($old['nombre'] ?? ''),
+        'emailValor'   => (string)($old['email'] ?? ''),
+        'rolSeleccionado'     => (int)($old['rol_id'] ?? 0),
         'breadcrumb' => ['Usuarios', 'Nuevo usuario'],
     ]);
 }

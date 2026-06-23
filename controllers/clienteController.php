@@ -75,9 +75,9 @@ function ClienteController_paginaLista(): void
 function ClienteController_paginaCrear(): void
 {
     $error = isset($_GET['error']) ? (string)$_GET['error'] : null;
-    $errorMsg = null;
-    if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Complete nombre y credenciales.'; }
-    if ($error === 'nombre_required') { $errorMsg = 'El nombre es obligatorio.'; }
+    $mensajeError = null;
+    if ($error === 'invalid_payload') { $mensajeError = 'Datos inválidos. Complete nombre y credenciales.'; }
+    if ($error === 'nombre_required') { $mensajeError = 'El nombre es obligatorio.'; }
 
     $plataformas = ClienteController_obtenerPlataformas();
     $camposPorPlataforma = [];
@@ -87,7 +87,7 @@ function ClienteController_paginaCrear(): void
 
     renderizarVista('clientes/crear.php', [
         'error'               => $error,
-        'errorMsg'            => $errorMsg,
+        'mensajeError'            => $mensajeError,
         'plataformas'         => $plataformas,
         'camposPorPlataforma' => $camposPorPlataforma,
         'esEdicion'              => false,
@@ -104,9 +104,9 @@ function ClienteController_paginaEditar(): void
     $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
     $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
     $error = isset($_GET['error']) ? (string)$_GET['error'] : null;
-    $errorMsg = null;
-    if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Verifique nombre y credenciales.'; }
-    if ($error === 'not_found') { $errorMsg = 'Cliente no encontrado o sin permiso.'; }
+    $mensajeError = null;
+    if ($error === 'invalid_payload') { $mensajeError = 'Datos inválidos. Verifique nombre y credenciales.'; }
+    if ($error === 'not_found') { $mensajeError = 'Cliente no encontrado o sin permiso.'; }
 
     $cliente = $clienteId > 0 ? (ClienteController_obtener($clienteId, $agenciaId) ?? []) : [];
     $plataformas = ClienteController_obtenerPlataformas();
@@ -121,7 +121,7 @@ function ClienteController_paginaEditar(): void
         'agenciaId'           => $agenciaId,
         'clienteId'           => $clienteId,
         'error'               => $error,
-        'errorMsg'            => $errorMsg,
+        'mensajeError'            => $mensajeError,
         'cliente'             => $cliente,
         'plataformas'         => $plataformas,
         'camposPorPlataforma' => $camposPorPlataforma,

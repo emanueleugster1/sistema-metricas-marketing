@@ -1,7 +1,7 @@
 <?php
 /*
  Vista pasiva. Recibe del controlador (UsuarioController_paginaCrear via renderizarVista):
-   $roles, $error, $nombreVal, $emailVal, $rolSel, $breadcrumb.
+   $roles, $error, $nombreValor, $emailValor, $rolSeleccionado, $breadcrumb.
    El guard de administrador se ejecuta en el controlador.
 */
 ?>
@@ -42,11 +42,11 @@
 
           <div class="form-field">
             <label for="nombre">Nombre</label>
-            <input id="nombre" name="nombre" type="text" required value="<?= htmlspecialchars($nombreVal, ENT_QUOTES, 'UTF-8') ?>">
+            <input id="nombre" name="nombre" type="text" required value="<?= htmlspecialchars($nombreValor, ENT_QUOTES, 'UTF-8') ?>">
           </div>
           <div class="form-field">
             <label for="email">Email</label>
-            <input id="email" name="email" type="email" required value="<?= htmlspecialchars($emailVal, ENT_QUOTES, 'UTF-8') ?>">
+            <input id="email" name="email" type="email" required value="<?= htmlspecialchars($emailValor, ENT_QUOTES, 'UTF-8') ?>">
           </div>
           <div class="form-field">
             <label for="rol_id">Rol</label>
@@ -55,7 +55,7 @@
                 <?php
                   $rid = (int)$r['id'];
                   $rnombre = (string)$r['nombre'];
-                  $selected = $rolSel > 0 ? ($rid === $rolSel) : ($rnombre === 'usuario');
+                  $selected = $rolSeleccionado > 0 ? ($rid === $rolSeleccionado) : ($rnombre === 'usuario');
                 ?>
                 <option value="<?= $rid ?>" <?= $selected ? 'selected' : '' ?>><?= htmlspecialchars($rnombre, ENT_QUOTES, 'UTF-8') ?></option>
               <?php endforeach; ?>

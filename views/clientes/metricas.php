@@ -1,10 +1,10 @@
 <?php
 /*
  Vista pasiva. Recibe del controlador (MetricaController_paginaMetricas via renderizarVista):
-   $clienteId, $agenciaId, $diasRango, $cliente, $tieneDashboard, $dashboardInfo,
-   $esEdicion, $plataformasCliente, $widgets, $errores, $recomMl, $visibleWidgets,
+   $clienteId, $agenciaId, $diasRango, $cliente, $tieneDashboard, $infoDashboard,
+   $esEdicion, $plataformasCliente, $widgets, $errores, $recomMl, $widgetsVisibles,
    $metaConectada, $ultimaFecha, $erroresMeta, $ultimaRec, $recomContent,
-   $widgetsPorPlataforma, $mode, $formAction, $widgetsVisiblesIds, $clienteNombre,
+   $widgetsPorPlataforma, $modo, $accionForm, $idsWidgetsVisibles, $clienteNombre,
    $breadcrumb.
 */
 
@@ -80,7 +80,7 @@ require_once __DIR__ . '/../../includes/fechaHelper.php';
 
     <?php if ($tieneDashboard): ?>
       <div class="cards">
-        <?php foreach ($visibleWidgets as $widget): ?>
+        <?php foreach ($widgetsVisibles as $widget): ?>
           <?php 
             $widgetId = (int)$widget['widget_id'];
             $nombre = htmlspecialchars((string)$widget['nombre'], ENT_QUOTES, 'UTF-8');
@@ -158,8 +158,8 @@ require_once __DIR__ . '/../../includes/fechaHelper.php';
 ?></div>
   </section>
     
-    <!-- Modal de Dashboard (Crear / Editar). El modelo del modal ($mode, $formAction,
-         $widgetsPorPlataforma, $widgetsVisiblesIds, $clienteNombre) lo prepara el controlador. -->
+    <!-- Modal de Dashboard (Crear / Editar). El modelo del modal ($modo, $accionForm,
+         $widgetsPorPlataforma, $idsWidgetsVisibles, $clienteNombre) lo prepara el controlador. -->
     <?php require __DIR__ . '/../../views/templates/dashboard_form.php'; ?>
 
   </main>
