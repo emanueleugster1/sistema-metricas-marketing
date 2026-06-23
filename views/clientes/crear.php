@@ -1,7 +1,7 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (ClienteController_paginaCrear via renderView):
-   $error, $errorMsg, $plataformas, $camposPorPlataforma, $isEdit, $cliente,
+ Vista pasiva. Recibe del controlador (ClienteController_paginaCrear via renderizarVista):
+   $error, $errorMsg, $plataformas, $camposPorPlataforma, $esEdicion, $cliente,
    $credencialesMap, $validadaMap, $breadcrumb. El template cliente_form.php consume
    estas mismas variables.
 */

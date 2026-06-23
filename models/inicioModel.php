@@ -14,11 +14,11 @@ final class InicioModel
 
     public function __construct()
     {
-        $this->db = Database::getInstance()->getConnection();
+        $this->db = Database::getInstance()->obtenerConexion();
     }
 
     /** KPIs de cabecera: totales de clientes, altas del mes, conexiones y dashboards. */
-    public function kpis(int $agenciaId): array
+    public function obtenerKpis(int $agenciaId): array
     {
         $sqlClientes = 'SELECT
                 COUNT(*) AS total,
@@ -61,7 +61,7 @@ final class InicioModel
      * Clientes activos que requieren atencion: sin dashboard, sin metricas, o
      * con datos de mas de 14 dias. Devuelve nombre + senales para el motivo.
      */
-    public function clientesRequierenAtencion(int $agenciaId, int $limite = 5): array
+    public function obtenerClientesQueRequierenAtencion(int $agenciaId, int $limite = 5): array
     {
         $sql = 'SELECT * FROM (
                     SELECT
@@ -89,7 +89,7 @@ final class InicioModel
      * Actividad reciente: ultimas altas de clientes y ultimas recomendaciones,
      * combinadas y ordenadas por fecha descendente.
      */
-    public function actividadReciente(int $agenciaId, int $limite = 6): array
+    public function obtenerActividadReciente(int $agenciaId, int $limite = 6): array
     {
         $sql = "(SELECT 'cliente' AS tipo, c.nombre AS titulo, c.fecha_creacion AS fecha
                  FROM clientes c

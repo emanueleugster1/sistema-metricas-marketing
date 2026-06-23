@@ -7,7 +7,7 @@ declare(strict_types=1);
 */
 
 // Carga de configuración desde .env
-function _readEnvFile(string $path): array
+function _leerArchivoEnv(string $path): array
 {
     $env = [];
     if (is_readable($path)) {
@@ -74,7 +74,7 @@ final class Database
     private function __construct()
     {
         $envPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env';
-        $env = _readEnvFile($envPath);
+        $env = _leerArchivoEnv($envPath);
         $this->config = [
             // Credenciales: SIN default hardcodeado. Si falta cualquiera, se lanza excepcion.
             'DB_HOST' => self::requerirEnv($env, 'DB_HOST'),
@@ -106,7 +106,7 @@ final class Database
     /**
      * Retorna la conexión PDO activa.
      */
-    public function getConnection(): PDO
+    public function obtenerConexion(): PDO
     {
         return $this->connection;
     }

@@ -1,24 +1,14 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (MetricaController_paginaMetricas via renderView):
+ Vista pasiva. Recibe del controlador (MetricaController_paginaMetricas via renderizarVista):
    $clienteId, $agenciaId, $diasRango, $cliente, $tieneDashboard, $dashboardInfo,
-   $editMode, $plataformasCliente, $widgets, $errores, $recomMl, $visibleWidgets,
+   $esEdicion, $plataformasCliente, $widgets, $errores, $recomMl, $visibleWidgets,
    $metaConectada, $ultimaFecha, $erroresMeta, $ultimaRec, $recomContent,
    $widgetsPorPlataforma, $mode, $formAction, $widgetsVisiblesIds, $clienteNombre,
    $breadcrumb.
 */
 
-function metricas_rel(?string $fecha): string {
-    if ($fecha === null || $fecha === '') { return '—'; }
-    $ts = strtotime($fecha);
-    if ($ts === false) { return '—'; }
-    $dias = (int) floor((time() - $ts) / 86400);
-    if ($dias <= 0) { return 'hoy'; }
-    if ($dias === 1) { return 'ayer'; }
-    if ($dias < 30) { return 'hace ' . $dias . ' d'; }
-    $meses = (int) floor($dias / 30);
-    return $meses === 1 ? 'hace 1 mes' : 'hace ' . $meses . ' meses';
-}
+require_once __DIR__ . '/../../includes/fechaHelper.php';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -48,7 +38,7 @@ function metricas_rel(?string $fecha): string {
           <?php else: ?>
             <span class="status status-inactive">Sin conexión</span>
           <?php endif; ?>
-          <?php if ($ultimaFecha): ?> · último dato <?= htmlspecialchars(metricas_rel($ultimaFecha), ENT_QUOTES, 'UTF-8') ?><?php endif; ?>
+          <?php if ($ultimaFecha): ?> · último dato <?= htmlspecialchars(formatearTiempoRelativo($ultimaFecha), ENT_QUOTES, 'UTF-8') ?><?php endif; ?>
         </p>
       </div>
       <div class="page-header-actions">
@@ -68,12 +58,12 @@ function metricas_rel(?string $fecha): string {
     </header>
 
     <?php if (!empty($erroresMeta['errores'])): ?>
-      <section class="panel" style="border-left: 3px solid var(--color-danger);">
+      <section class="panel panel-error">
         <div class="panel-header">
           <h2 class="panel-title"><i class="bi bi-exclamation-triangle"></i> No se pudieron cargar algunos datos</h2>
         </div>
         <div class="panel-body">
-          <ul style="margin: 0; padding-left: var(--spacing-lg);">
+          <ul class="error-list">
             <?php foreach ($erroresMeta['errores'] as $msg): ?>
               <li><?= htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') ?></li>
             <?php endforeach; ?>
@@ -82,7 +72,7 @@ function metricas_rel(?string $fecha): string {
       </section>
     <?php endif; ?>
     <?php if (!empty($erroresMeta['avisos'])): ?>
-      <p class="cell-empty" style="margin: 0 0 var(--spacing-md);">
+      <p class="cell-empty meta-avisos">
         <i class="bi bi-info-circle"></i>
         <?= htmlspecialchars(implode(' · ', $erroresMeta['avisos']), ENT_QUOTES, 'UTF-8') ?>
       </p>
@@ -104,7 +94,7 @@ function metricas_rel(?string $fecha): string {
             <div class="card-sub"><?= $descripcion ?></div>
             
             <?php if ($tipoVis === 'chart'): ?>
-              <div class="chart-container" style="height: 200px; position: relative;">
+              <div class="chart-container">
                 <canvas id="chart-<?= $widgetId ?>"></canvas>
                 <div id="loader-<?= $widgetId ?>" class="widget-loader">
                     <div class="spinner-border"></div>
@@ -112,7 +102,7 @@ function metricas_rel(?string $fecha): string {
               </div>
             
             <?php elseif ($tipoVis === 'gauge'): ?>
-              <div class="gauge-container" style="height: 150px; position: relative;">
+              <div class="gauge-container">
                 <canvas id="gauge-<?= $widgetId ?>"></canvas>
                 <div id="loader-<?= $widgetId ?>" class="widget-loader">
                     <div class="spinner-border"></div>
@@ -120,7 +110,7 @@ function metricas_rel(?string $fecha): string {
               </div>
             
             <?php elseif ($tipoVis === 'metric'): ?>
-              <div class="metric-container" style="text-align: center; padding: 20px;">
+              <div class="metric-container">
                 <div id="metric-<?= $widgetId ?>" class="big-number">
                   <div class="spinner-container">
                     <div class="spinner-border"></div>
@@ -129,9 +119,9 @@ function metricas_rel(?string $fecha): string {
               </div>
             
             <?php elseif ($tipoVis === 'table'): ?>
-              <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+              <div class="table-container">
                 <div id="table-<?= $widgetId ?>">
-                  <div class="spinner-container" style="padding: 2rem;">
+                  <div class="spinner-container spinner-pad">
                     <div class="spinner-border"></div>
                   </div>
                 </div>

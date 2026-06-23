@@ -41,7 +41,7 @@ header('Pragma: no-cache');
  * su scope las variables que prepara el controlador (contrato via extract()).
  * Es el unico punto que incluye vistas: el flujo es router -> controlador -> vista.
  */
-function renderView(string $view, array $data = []): void
+function renderizarVista(string $view, array $data = []): void
 {
     $viewsDir  = __DIR__ . '/views/';
     $viewsReal = realpath($viewsDir);
@@ -57,7 +57,7 @@ function renderView(string $view, array $data = []): void
 }
 
 // --- Tabla de rutas: metodo, patron del path, archivo de controlador, handler, params ---
-// Cada handler prepara los datos y carga la vista pasiva con renderView().
+// Cada handler prepara los datos y carga la vista pasiva con renderizarVista().
 $routes = [
     ['GET', '#^/?$#',                         'inicioController.php',  'InicioController_pagina',          []],
     ['GET', '#^/dashboard/?$#',               'inicioController.php',  'InicioController_pagina',          []],

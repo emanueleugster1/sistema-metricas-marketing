@@ -13,7 +13,7 @@ require_once __DIR__ . '/../api/ml/RecomendadorML.php';
  * permitido. Default 30 (retrocompatible); whitelist {30,60,90} para no inyectar
  * ventanas arbitrarias en las llamadas a Meta.
  */
-function DashboardController_diasWhitelist($raw): int
+function DashboardController_normalizarDias($raw): int
 {
     $d = (int)$raw;
     return in_array($d, [30, 60, 90], true) ? $d : 30;
@@ -24,7 +24,7 @@ function DashboardController_diasWhitelist($raw): int
  * devuelve null: se conserva date_preset='last_30d' (comportamiento EXACTO previo).
  * Para 60/90 arma la ventana explicita (Meta no tiene preset last_60d).
  */
-function DashboardController_timeRangeDias(int $dias): ?array
+function DashboardController_calcularRangoDias(int $dias): ?array
 {
     if ($dias === 30) {
         return null;
@@ -32,7 +32,7 @@ function DashboardController_timeRangeDias(int $dias): ?array
     return ['since' => date('Y-m-d', strtotime('-' . $dias . ' days')), 'until' => date('Y-m-d')];
 }
 
-function DashboardController_buildRecommendations(array $rows, array $featureKeys): array
+function DashboardController_generarRecomendaciones(array $rows, array $featureKeys): array
 {
     // Fix 3: el ML puede lanzar (matriz singular / features colineales). Si falla,
     // degradamos sin romper el dashboard: seguimos sin texto tecnico de ML.
@@ -43,13 +43,13 @@ function DashboardController_buildRecommendations(array $rows, array $featureKey
     } catch (\Throwable $e) {
         $mlText = '';
     }
-    $env = _readEnvFile(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
+    $env = _leerArchivoEnv(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
     $apiKey = (string)($env['GEMINI_API_KEY'] ?? getenv('GEMINI_API_KEY') ?: '');
     $aiMl = '';
     $aiOk = false;
     if ($apiKey !== '' && $mlText !== '') {
         $gemini = new GeminiConnector($apiKey);
-        $res = $gemini->translateRecommendation($mlText, 'Explica recomendacion en lenguaje sencillo. En español.');
+        $res = $gemini->traducirRecomendacion($mlText, 'Explica recomendacion en lenguaje sencillo. En español.');
         // Fix 1: solo es una recomendacion valida si Gemini respondio bien.
         if (is_array($res) && ($res['success'] ?? false) === true) {
             $aiMl = (string)($res['text'] ?? '');
@@ -202,10 +202,10 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
     return ['success' => true, 'inserted' => $inserted];
 }
 
-function DashboardController_widgetsDisponibles(int $plataformaId): array
+function DashboardController_obtenerWidgetsDisponibles(int $plataformaId): array
 {
     $model = new DashboardModel();
-    $model->ensureDefaultWidgets();
+    $model->garantizarWidgetsPorDefecto();
     $all = $model->listarWidgetsActivos();
     $allowed = $all;
     if ($plataformaId === 5) {
@@ -215,10 +215,10 @@ function DashboardController_widgetsDisponibles(int $plataformaId): array
     return $allowed;
 }
 
-function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias = 30): array
+function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int $dias = 30): array
 {
-    $dias = DashboardController_diasWhitelist($dias);
-    $adsTimeRange = DashboardController_timeRangeDias($dias);
+    $dias = DashboardController_normalizarDias($dias);
+    $adsTimeRange = DashboardController_calcularRangoDias($dias);
     $model = new DashboardModel();
     $clienteModel = new MetricaModel();
     $cliente = $clienteModel->obtenerClientePorId($clienteId);
@@ -226,12 +226,12 @@ function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias =
         return ['success' => false, 'error' => 'not_found_or_forbidden'];
     }
     $dashboard = $model->obtenerDashboardPorCliente($clienteId);
-    $hasDashboard = $dashboard !== null;
-    $widgets = $hasDashboard ? $model->obtenerWidgetsPorDashboard((int)$dashboard['id']) : [];
+    $tieneDashboard = $dashboard !== null;
+    $widgets = $tieneDashboard ? $model->obtenerWidgetsPorDashboard((int)$dashboard['id']) : [];
     $plataformas = $model->obtenerPlataformasVinculadas($clienteId);
     $metricas = [];
     $errores = [];
-    if ($hasDashboard && !empty($plataformas)) {
+    if ($tieneDashboard && !empty($plataformas)) {
         foreach ($plataformas as $plat) {
             $pid = (int)$plat['plataforma_id'];
             if ($pid === 5) {
@@ -361,7 +361,7 @@ function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias =
             $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
             $filtered = !empty($selected) ? array_values(array_filter($allRows, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
             if (!empty($filtered)) {
-                $rec = DashboardController_buildRecommendations($filtered, $selected);
+                $rec = DashboardController_generarRecomendaciones($filtered, $selected);
                 $traduccionAi = (string)$rec['ml'];
 
                 // Fix 1: solo persistir/cachear si la IA respondio bien y no vacio.
@@ -380,7 +380,7 @@ function DashboardController_resumen(int $clienteId, int $agenciaId, int $dias =
         'success' => true,
         'clienteInfo' => $cliente,
         'dashboardInfo' => $dashboard,
-        'hasDashboard' => $hasDashboard,
+        'hasDashboard' => $tieneDashboard,
         'plataformas' => $plataformas,
         'widgets' => $widgets,
         'metricas' => $metricas,
@@ -413,7 +413,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             exit;
         }
 
-        $data = DashboardController_resumen($clienteId, $agenciaId);
+        $data = DashboardController_obtenerResumen($clienteId, $agenciaId);
         echo json_encode($data);
         exit;
     }
@@ -425,7 +425,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             echo json_encode(['success' => false, 'error' => 'invalid_plataforma']);
             exit;
         }
-        $list = DashboardController_widgetsDisponibles($pid);
+        $list = DashboardController_obtenerWidgetsDisponibles($pid);
         echo json_encode(['success' => true, 'data' => $list]);
         exit;
     }
@@ -501,7 +501,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
             $filtered = !empty($selected) ? array_values(array_filter($rowsNow, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
             if (!empty($filtered)) {
-                $rec = DashboardController_buildRecommendations($filtered, $selected);
+                $rec = DashboardController_generarRecomendaciones($filtered, $selected);
                 $contenido = (string)$rec['ml'];
                 if ($contenido === '' && (string)$rec['ai_ml'] !== '') { $contenido = (string)$rec['ai_ml']; }
             }

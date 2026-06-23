@@ -46,7 +46,7 @@ function UsuarioController_paginaLista(): void
     $flashError = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
     unset($_SESSION['usuarios_info'], $_SESSION['usuarios_error']);
 
-    renderView('usuarios/lista.php', [
+    renderizarVista('usuarios/lista.php', [
         'usuarios'   => $usuarios,
         'miId'       => $miId,
         'total'      => $total,
@@ -66,7 +66,7 @@ function UsuarioController_paginaCrear(): void
     $old = isset($_SESSION['usuarios_old']) && is_array($_SESSION['usuarios_old']) ? $_SESSION['usuarios_old'] : [];
     unset($_SESSION['usuarios_error'], $_SESSION['usuarios_old']);
 
-    renderView('usuarios/crear.php', [
+    renderizarVista('usuarios/crear.php', [
         'roles'      => $roles,
         'error'      => $error,
         'nombreVal'  => (string)($old['nombre'] ?? ''),
@@ -93,7 +93,7 @@ function UsuarioController_paginaEditar(): void
     unset($_SESSION['usuarios_error']);
     $rolActual = (int)($usuario['rol_id'] ?? 0);
 
-    renderView('usuarios/editar.php', [
+    renderizarVista('usuarios/editar.php', [
         'id'         => $id,
         'usuario'    => $usuario,
         'roles'      => $roles,

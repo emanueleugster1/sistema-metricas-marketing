@@ -79,8 +79,8 @@ final class RecomendadorML
         $p2Parts = [];
         $medians = [];
         foreach ($summaryKeys as $k) {
-            $vals = $this->collectMetric($byDate, $k);
-            $med = $this->median($vals);
+            $vals = $this->recolectarMetrica($byDate, $k);
+            $med = $this->calcularMediana($vals);
             if ($med === null) continue;
             $medians[$k] = (float)$med;
             $label = ucfirst(str_replace('_',' ',$k)) . ' mediano ';
@@ -96,7 +96,7 @@ final class RecomendadorML
             $p3 = 'Proyección: estimado de ' . $label . ' ' . $this->fmt($predCtr, $suffix) . '.';
         }
 
-        $p4 = $this->diagnostico($latestMap, $medians, $summaryKeys);
+        $p4 = $this->generarDiagnostico($latestMap, $medians, $summaryKeys);
 
         $parts = [$p1, $p2];
         if ($p3 !== '') { $parts[] = $p3; }
@@ -104,7 +104,7 @@ final class RecomendadorML
         return implode("\n\n", $parts);
     }
 
-    private function collectMetric(array $byDate, string $name): array
+    private function recolectarMetrica(array $byDate, string $name): array
     {
         $vals = [];
         foreach ($byDate as $m) { if (isset($m[$name]) && is_numeric($m[$name])) $vals[] = (float)$m[$name]; }
@@ -112,7 +112,7 @@ final class RecomendadorML
         return $vals;
     }
 
-    private function median(array $vals): ?float
+    private function calcularMediana(array $vals): ?float
     {
         $n = count($vals);
         if ($n === 0) return null;
@@ -128,7 +128,7 @@ final class RecomendadorML
         return $suffix === '' ? $s : ($s . $suffix);
     }
 
-    private function diagnostico(array $latestMap, array $medians, array $keys): string
+    private function generarDiagnostico(array $latestMap, array $medians, array $keys): string
     {
         $entries = [];
         foreach ($keys as $k) {

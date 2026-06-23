@@ -1,22 +1,10 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (InicioController_pagina via renderView):
+ Vista pasiva. Recibe del controlador (InicioController_pagina via renderizarVista):
    $kpis, $atencion, $actividad, $breadcrumb.
 */
 
-/** Formato de fecha en lenguaje relativo (solo presentacion). */
-function dash_tiempo_relativo(?string $fecha): string
-{
-    if ($fecha === null || $fecha === '') { return '—'; }
-    $ts = strtotime($fecha);
-    if ($ts === false) { return '—'; }
-    $dias = (int) floor((time() - $ts) / 86400);
-    if ($dias <= 0) { return 'hoy'; }
-    if ($dias === 1) { return 'ayer'; }
-    if ($dias < 30) { return 'hace ' . $dias . ' d'; }
-    $meses = (int) floor($dias / 30);
-    return $meses === 1 ? 'hace 1 mes' : 'hace ' . $meses . ' meses';
-}
+require_once __DIR__ . '/../../includes/fechaHelper.php';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -104,14 +92,14 @@ function dash_tiempo_relativo(?string $fecha): string
                 <?php foreach ($atencion as $a): ?>
                   <?php
                     $aid = (int)$a['id'];
-                    $tieneDash = (int)($a['tiene_dashboard'] ?? 0) === 1;
+                    $tieneDashboard = (int)($a['tiene_dashboard'] ?? 0) === 1;
                     $ult = $a['ultima_metrica'] ?? null;
-                    if (!$tieneDash) {
+                    if (!$tieneDashboard) {
                         $motivo = 'Sin dashboard'; $accion = 'Configurar';
                     } elseif ($ult === null) {
                         $motivo = 'Sin métricas'; $accion = 'Ver';
                     } else {
-                        $motivo = 'Sin datos ' . dash_tiempo_relativo($ult); $accion = 'Ver';
+                        $motivo = 'Sin datos ' . formatearTiempoRelativo($ult); $accion = 'Ver';
                     }
                   ?>
                   <tr>
@@ -150,7 +138,7 @@ function dash_tiempo_relativo(?string $fecha): string
                           Recomendación generada para <strong><?= $nombreEv ?></strong>
                         <?php endif; ?>
                       </span>
-                      <span class="activity-time"><?= htmlspecialchars(dash_tiempo_relativo($ev['fecha'] ?? null), ENT_QUOTES, 'UTF-8') ?></span>
+                      <span class="activity-time"><?= htmlspecialchars(formatearTiempoRelativo($ev['fecha'] ?? null), ENT_QUOTES, 'UTF-8') ?></span>
                     </span>
                   </li>
                 <?php endforeach; ?>

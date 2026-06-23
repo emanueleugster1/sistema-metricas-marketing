@@ -1,6 +1,6 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (UsuarioController_paginaLista via renderView):
+ Vista pasiva. Recibe del controlador (UsuarioController_paginaLista via renderizarVista):
    $usuarios, $miId, $total, $activos, $flashInfo, $flashError, $breadcrumb.
    El guard de administrador se ejecuta en el controlador.
 */

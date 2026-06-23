@@ -1,6 +1,6 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (UsuarioController_paginaCrear via renderView):
+ Vista pasiva. Recibe del controlador (UsuarioController_paginaCrear via renderizarVista):
    $roles, $error, $nombreVal, $emailVal, $rolSel, $breadcrumb.
    El guard de administrador se ejecuta en el controlador.
 */

@@ -9,7 +9,7 @@ class UsuarioModel
 
     public function __construct()
     {
-        $this->db = Database::getInstance()->getConnection();
+        $this->db = Database::getInstance()->obtenerConexion();
     }
 
     public function validarCredenciales(string $email, string $password): ?array

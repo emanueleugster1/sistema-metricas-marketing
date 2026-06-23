@@ -12,10 +12,10 @@
  * $clienteNombre : string (Para prellenar nombre en create)
  */
 
-$isCreate = ($mode === 'create');
-$checkboxName = $isCreate ? 'widgets_ids[]' : 'widgets[]';
-$submitLabel = $isCreate ? 'Crear Dashboard' : 'Guardar Cambios';
-$modalTitle = $isCreate ? 'Crear Dashboard' : 'Personalizar Dashboard';
+$esCreacion = ($mode === 'create');
+$checkboxName = $esCreacion ? 'widgets_ids[]' : 'widgets[]';
+$submitLabel = $esCreacion ? 'Crear Dashboard' : 'Guardar Cambios';
+$modalTitle = $esCreacion ? 'Crear Dashboard' : 'Personalizar Dashboard';
 ?>
 
 <div id="dashboard-modal" class="modal-overlay">
@@ -31,14 +31,13 @@ $modalTitle = $isCreate ? 'Crear Dashboard' : 'Personalizar Dashboard';
         <!-- Formulario -->
         <form id="dashboard-form" method="POST" action="<?= htmlspecialchars($formAction) ?>">
             
-            <?php if ($isCreate): ?>
+            <?php if ($esCreacion): ?>
                 <input type="hidden" name="cliente_id" value="<?= (int)$clienteId ?>">
                 <input type="hidden" name="redirect" value="1">
                 
-                <div style="margin-bottom: var(--spacing-xl);">
-                    <label for="dash-nombre" style="display:block; margin-bottom: var(--spacing-sm); font-weight: var(--font-weight-semibold); color: var(--color-gray-800);">Nombre del Dashboard</label>
-                    <input type="text" id="dash-nombre" name="nombre" class="select-lite" 
-                           style="width: 100%; border: 1px solid var(--color-gray-300); padding: 0.8rem; font-size: var(--font-size-base);" 
+                <div class="dashform-field">
+                    <label for="dash-nombre" class="dashform-label">Nombre del Dashboard</label>
+                    <input type="text" id="dash-nombre" name="nombre" class="select-lite dashform-input"
                            value="<?= htmlspecialchars($clienteNombre ?? '') ?>" required>
                 </div>
             <?php else: ?>

@@ -14,13 +14,13 @@ declare(strict_types=1);
  * CHECK json_valid) lo acepta SIN necesidad de cambiar el tipo ni soltar constraints.
  * El token real queda cifrado dentro de "_dato"; no se puede leer.
  *
- * Lectura RETROCOMPATIBLE: credencialesDescifrar() entiende tanto el sobre cifrado
+ * Lectura RETROCOMPATIBLE: descifrarCredenciales() entiende tanto el sobre cifrado
  * nuevo como el JSON en texto plano legacy, asi ninguna conexion existente se rompe.
  * El migrador (migrar_cifrar_credenciales.php) reescribe las filas planas a cifradas
  * de forma idempotente.
  */
 
-require_once __DIR__ . '/../config/databaseConfig.php'; // provee _readEnvFile()
+require_once __DIR__ . '/../config/databaseConfig.php'; // provee _leerArchivoEnv()
 
 const CREDENCIALES_VERSION = 'v1';
 
@@ -28,7 +28,7 @@ const CREDENCIALES_VERSION = 'v1';
  * Campos sensibles del JSON de credenciales. Fuente unica de verdad usada por el
  * modelo (merge "vacio = mantener") y por la vista (enmascarado del Arreglo 2).
  */
-function camposSensiblesCredenciales(): array
+function obtenerCamposSensibles(): array
 {
     return ['access_token'];
 }
@@ -37,13 +37,13 @@ function camposSensiblesCredenciales(): array
  * Devuelve la clave binaria (32 bytes) desde .env, o lanza si falta/es invalida.
  * No persistimos nada que despues no podriamos descifrar.
  */
-function _credencialesClave(): string
+function _obtenerClaveCredenciales(): string
 {
     static $clave = null;
     if ($clave !== null) {
         return $clave;
     }
-    $env = _readEnvFile(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
+    $env = _leerArchivoEnv(dirname(__DIR__) . DIRECTORY_SEPARATOR . '.env');
     $b64 = (string)($env['CREDENCIALES_KEY'] ?? getenv('CREDENCIALES_KEY') ?: '');
     if ($b64 === '') {
         throw new RuntimeException('CREDENCIALES_KEY ausente en .env: no se puede cifrar/descifrar credenciales.');
@@ -59,7 +59,7 @@ function _credencialesClave(): string
 /** Cifra un texto y lo devuelve como sobre JSON valido. */
 function cifrarTextoCredencial(string $texto): string
 {
-    $clave = _credencialesClave();
+    $clave = _obtenerClaveCredenciales();
     $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
     $cipher = sodium_crypto_secretbox($texto, $nonce, $clave);
     $sobre = ['_cifrado' => CREDENCIALES_VERSION, '_dato' => base64_encode($nonce . $cipher)];
@@ -83,7 +83,7 @@ function descifrarTextoCredencial(string $valor): ?string
     $nonce = substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
     $cipher = substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
     try {
-        $plano = sodium_crypto_secretbox_open($cipher, $nonce, _credencialesClave());
+        $plano = sodium_crypto_secretbox_open($cipher, $nonce, _obtenerClaveCredenciales());
     } catch (Throwable $e) {
         return null;
     }
@@ -91,14 +91,14 @@ function descifrarTextoCredencial(string $valor): ?string
 }
 
 /** ¿El valor de la columna es un sobre cifrado nuestro? */
-function credencialesEstaCifrado(string $valor): bool
+function estaCifrado(string $valor): bool
 {
     $sobre = json_decode($valor, true);
     return is_array($sobre) && isset($sobre['_cifrado'], $sobre['_dato']);
 }
 
 /** Cifra el array de campos de un registro de credenciales para persistir. */
-function credencialesCifrar(array $campos): string
+function cifrarCredenciales(array $campos): string
 {
     $json = json_encode($campos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json === false) {
@@ -111,13 +111,13 @@ function credencialesCifrar(array $campos): string
  * Lee el valor de la columna credenciales y devuelve el array de campos.
  * RETROCOMPATIBLE: sobre cifrado -> descifra; texto plano legacy -> json_decode directo.
  */
-function credencialesDescifrar(?string $columna): array
+function descifrarCredenciales(?string $columna): array
 {
     $columna = (string)$columna;
     if ($columna === '') {
         return [];
     }
-    if (credencialesEstaCifrado($columna)) {
+    if (estaCifrado($columna)) {
         $plano = descifrarTextoCredencial($columna);
         if ($plano === null) {
             return []; // no recuperable (clave/manipulacion): array vacio controlado

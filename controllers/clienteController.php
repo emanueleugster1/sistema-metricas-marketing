@@ -23,25 +23,25 @@ function ClienteController_obtener(int $id, int $agenciaId): ?array
     return $model->obtenerPorId($id, $agenciaId);
 }
 
-function ClienteController_plataformas(): array
+function ClienteController_obtenerPlataformas(): array
 {
     $model = new ClienteModel();
     return $model->obtenerPlataformasActivas();
 }
 
-function ClienteController_plataforma_campos(int $pid): array
+function ClienteController_obtenerCamposPlataforma(int $pid): array
 {
     $model = new ClienteModel();
     return $model->obtenerCamposPorPlataforma($pid);
 }
 
-function ClienteController_cliente_credenciales(int $cid): array
+function ClienteController_obtenerCredencialesCliente(int $cid): array
 {
     $model = new ClienteModel();
     return $model->obtenerCredencialesPorCliente($cid);
 }
 
-function ClienteController_estado_credenciales(int $cid): array
+function ClienteController_obtenerEstadoCredenciales(int $cid): array
 {
     $model = new ClienteModel();
     return $model->obtenerValidadasPorCliente($cid);
@@ -62,7 +62,7 @@ function ClienteController_paginaLista(): void
         if ((int)$c['activo'] === 1) { $totalActivos++; }
     }
 
-    renderView('clientes/lista.php', [
+    renderizarVista('clientes/lista.php', [
         'clientes'      => $clientes,
         'q'             => $q,
         'totalClientes' => $totalClientes,
@@ -79,18 +79,18 @@ function ClienteController_paginaCrear(): void
     if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Complete nombre y credenciales.'; }
     if ($error === 'nombre_required') { $errorMsg = 'El nombre es obligatorio.'; }
 
-    $plataformas = ClienteController_plataformas();
+    $plataformas = ClienteController_obtenerPlataformas();
     $camposPorPlataforma = [];
     foreach ($plataformas as $p) {
-        $camposPorPlataforma[(int)$p['id']] = ClienteController_plataforma_campos((int)$p['id']);
+        $camposPorPlataforma[(int)$p['id']] = ClienteController_obtenerCamposPlataforma((int)$p['id']);
     }
 
-    renderView('clientes/crear.php', [
+    renderizarVista('clientes/crear.php', [
         'error'               => $error,
         'errorMsg'            => $errorMsg,
         'plataformas'         => $plataformas,
         'camposPorPlataforma' => $camposPorPlataforma,
-        'isEdit'              => false,
+        'esEdicion'              => false,
         'cliente'             => [],
         'credencialesMap'     => [],
         'validadaMap'         => [],
@@ -109,15 +109,15 @@ function ClienteController_paginaEditar(): void
     if ($error === 'not_found') { $errorMsg = 'Cliente no encontrado o sin permiso.'; }
 
     $cliente = $clienteId > 0 ? (ClienteController_obtener($clienteId, $agenciaId) ?? []) : [];
-    $plataformas = ClienteController_plataformas();
+    $plataformas = ClienteController_obtenerPlataformas();
     $camposPorPlataforma = [];
     foreach ($plataformas as $p) {
-        $camposPorPlataforma[(int)$p['id']] = ClienteController_plataforma_campos((int)$p['id']);
+        $camposPorPlataforma[(int)$p['id']] = ClienteController_obtenerCamposPlataforma((int)$p['id']);
     }
-    $credencialesMap = $clienteId > 0 ? ClienteController_cliente_credenciales($clienteId) : [];
-    $validadaMap = $clienteId > 0 ? ClienteController_estado_credenciales($clienteId) : [];
+    $credencialesMap = $clienteId > 0 ? ClienteController_obtenerCredencialesCliente($clienteId) : [];
+    $validadaMap = $clienteId > 0 ? ClienteController_obtenerEstadoCredenciales($clienteId) : [];
 
-    renderView('clientes/editar.php', [
+    renderizarVista('clientes/editar.php', [
         'agenciaId'           => $agenciaId,
         'clienteId'           => $clienteId,
         'error'               => $error,
@@ -127,7 +127,7 @@ function ClienteController_paginaEditar(): void
         'camposPorPlataforma' => $camposPorPlataforma,
         'credencialesMap'     => $credencialesMap,
         'validadaMap'         => $validadaMap,
-        'isEdit'              => true,
+        'esEdicion'              => true,
         'breadcrumb'          => ['Clientes', 'Editar cliente'],
     ]);
 }

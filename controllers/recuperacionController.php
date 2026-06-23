@@ -17,7 +17,7 @@ require_once __DIR__ . '/../includes/passwordHelper.php';
 */
 
 /** Hash con el que se guarda y se busca el token (no se almacena en claro). */
-function RecuperacionController_hashToken(string $tokenPlano): string
+function RecuperacionController_hashearToken(string $tokenPlano): string
 {
     return hash('sha256', $tokenPlano);
 }
@@ -33,7 +33,7 @@ function RecuperacionController_validarToken(string $tokenPlano): ?array
         return null;
     }
     $model = new UsuarioModel();
-    return $model->obtenerPorTokenRecuperacion(RecuperacionController_hashToken($tokenPlano));
+    return $model->obtenerPorTokenRecuperacion(RecuperacionController_hashearToken($tokenPlano));
 }
 
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((string)$_SERVER['SCRIPT_FILENAME'])) {
@@ -57,7 +57,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         if ($usuario !== null && (int)($usuario['activo'] ?? 0) === 1) {
             // Token aleatorio: viaja en claro en el enlace, se guarda hasheado.
             $tokenPlano = bin2hex(random_bytes(32));
-            $tokenHash = RecuperacionController_hashToken($tokenPlano);
+            $tokenHash = RecuperacionController_hashearToken($tokenPlano);
             $expira = date('Y-m-d H:i:s', time() + 3600); // vigencia: 1 hora
             $model->guardarTokenRecuperacion((int)$usuario['id'], $tokenHash, $expira);
 

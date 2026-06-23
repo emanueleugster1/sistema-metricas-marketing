@@ -10,7 +10,7 @@ class ClienteModel
 
     public function __construct()
     {
-        $this->db = Database::getInstance()->getConnection();
+        $this->db = Database::getInstance()->obtenerConexion();
     }
 
     public function listarTodos(int $limit = 50, int $offset = 0, ?int $agenciaId = null, ?string $q = null): array
@@ -154,8 +154,8 @@ class ClienteModel
             $stmtCred = $this->db->prepare($sqlCred);
 
             foreach ($credencialesPorPlataforma as $plataformaId => $campos) {
-                // Arreglo 1: se persiste cifrado (credencialesCifrar lanza si falta la clave).
-                $blob = credencialesCifrar($campos);
+                // Arreglo 1: se persiste cifrado (cifrarCredenciales lanza si falta la clave).
+                $blob = cifrarCredenciales($campos);
                 $ok = $stmtCred->execute([$clienteId, (int)$plataformaId, $blob]);
                 if (!$ok) {
                     $this->db->rollBack();
@@ -166,6 +166,7 @@ class ClienteModel
             $this->db->commit();
             return true;
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
@@ -181,7 +182,7 @@ class ClienteModel
         $rows = $stmt->fetchAll();
         $result = [];
         foreach ($rows as $r) {
-            $decoded = credencialesDescifrar((string)$r['credenciales']);
+            $decoded = descifrarCredenciales((string)$r['credenciales']);
             $result[(int)$r['plataforma_id']] = $decoded;
         }
         return $result;
@@ -225,7 +226,7 @@ class ClienteModel
             $sqlUpdCred = 'UPDATE credenciales_plataforma SET credenciales = ?, fecha_actualizacion = NOW() WHERE cliente_id = ? AND plataforma_id = ?';
             $stmtUpdCred = $this->db->prepare($sqlUpdCred);
 
-            $sensibles = camposSensiblesCredenciales();
+            $sensibles = obtenerCamposSensibles();
 
             foreach ($credencialesPorPlataforma as $plataformaId => $campos) {
                 $stmtSel->execute([$clienteId, (int)$plataformaId]);
@@ -234,10 +235,10 @@ class ClienteModel
 
                 if ($exists) {
                     $colExist = (string)($rowExist['credenciales'] ?? '');
-                    $existentes = credencialesDescifrar($colExist);
+                    $existentes = descifrarCredenciales($colExist);
                     // ¿El valor guardado estaba cifrado pero no se pudo descifrar?
                     $existenteIlegible = ($colExist !== ''
-                        && credencialesEstaCifrado($colExist)
+                        && estaCifrado($colExist)
                         && descifrarTextoCredencial($colExist) === null);
 
                     // Arreglo 2: merge "vacio = mantener" para los campos sensibles.
@@ -256,10 +257,10 @@ class ClienteModel
                     if ($noSobreescribir) {
                         continue; // dejamos las credenciales de esta plataforma intactas
                     }
-                    $blob = credencialesCifrar($campos);
+                    $blob = cifrarCredenciales($campos);
                     $ok = $stmtUpdCred->execute([$blob, $clienteId, (int)$plataformaId]);
                 } else {
-                    $blob = credencialesCifrar($campos);
+                    $blob = cifrarCredenciales($campos);
                     $ok = $stmtIns->execute([$clienteId, (int)$plataformaId, $blob]);
                 }
                 if (!$ok) {
@@ -271,6 +272,7 @@ class ClienteModel
             $this->db->commit();
             return true;
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }

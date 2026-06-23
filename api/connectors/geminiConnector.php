@@ -13,7 +13,7 @@ final class GeminiConnector
         $this->apiKey = trim($apiKey);
     }
 
-    private function postGenerateContent(array $payload): array
+    private function enviarGeneracionContenido(array $payload): array
     {
         $endpoint = rtrim($this->apiUrl, '/') . '/' . $this->model . ':generateContent?key=' . urlencode($this->apiKey);
         $ch = curl_init($endpoint);
@@ -41,7 +41,7 @@ final class GeminiConnector
         return ['success' => false, 'error' => 'http_error', 'status' => $code, 'data' => $json];
     }
 
-    private function extractTextFromResponse(array $resp): string
+    private function extraerTextoDeRespuesta(array $resp): string
     {
         $data = $resp['data'] ?? [];
         if (!is_array($data)) return '';
@@ -71,7 +71,7 @@ final class GeminiConnector
      * Asi el caller distingue una recomendacion real de un error (429, bloqueo, etc.)
      * y no lo persiste como si fuera valido.
      */
-    public function translateRecommendation(string $recommendationText, string $promptInstructions): array
+    public function traducirRecomendacion(string $recommendationText, string $promptInstructions): array
     {
 
         $internalPrompt = 'Actúas como un Especialista Técnico de Marketing. Tu tarea es analizar la recomendación técnica de ML y traducirla a una conclusión clara y una acción ejecutiva.
@@ -108,7 +108,7 @@ final class GeminiConnector
             ],
         ];
 
-        $resp = $this->postGenerateContent($payload);
+        $resp = $this->enviarGeneracionContenido($payload);
         if (!$resp['success']) {
             $status = (string)($resp['status'] ?? '');
             $msg = is_array($resp['data'] ?? null) ? ($resp['data']['error']['message'] ?? '') : '';
@@ -116,7 +116,7 @@ final class GeminiConnector
             $detalle = 'Error ' . ($status !== '' ? $status . ' ' : '') . $err . ($msg !== '' ? (': ' . $msg) : '');
             return ['success' => false, 'error' => $detalle];
         }
-        $text = $this->extractTextFromResponse($resp);
+        $text = $this->extraerTextoDeRespuesta($resp);
         if ($text !== '') {
             return ['success' => true, 'text' => $text];
         }

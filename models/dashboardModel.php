@@ -10,7 +10,7 @@ final class DashboardModel
 
     public function __construct()
     {
-        $this->db = Database::getInstance()->getConnection();
+        $this->db = Database::getInstance()->obtenerConexion();
     }
 
     public function obtenerDashboardPorCliente(int $clienteId): ?array
@@ -64,7 +64,7 @@ final class DashboardModel
         if (!$row || !isset($row['credenciales'])) {
             return null;
         }
-        $data = credencialesDescifrar((string)$row['credenciales']);
+        $data = descifrarCredenciales((string)$row['credenciales']);
         return !empty($data) ? $data : null;
     }
 
@@ -98,6 +98,7 @@ final class DashboardModel
             $this->db->commit();
             return true;
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             $this->db->rollBack();
             return false;
         }
@@ -111,7 +112,7 @@ final class DashboardModel
         return $stmt->fetchAll() ?: [];
     }
 
-    public function ensureDefaultWidgets(): void
+    public function garantizarWidgetsPorDefecto(): void
     {
         $sqlCount = 'SELECT COUNT(1) AS c FROM widgets WHERE activo = 1';
         $c = (int)($this->db->query($sqlCount)->fetch()['c'] ?? 0);

@@ -1,6 +1,6 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (UsuarioController_paginaEditar via renderView):
+ Vista pasiva. Recibe del controlador (UsuarioController_paginaEditar via renderizarVista):
    $id, $usuario, $roles, $miId, $esYo, $error, $rolActual, $breadcrumb.
    El guard de administrador y el redirect de usuario-null se ejecutan en el controlador.
 */

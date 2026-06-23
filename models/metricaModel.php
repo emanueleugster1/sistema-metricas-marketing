@@ -10,7 +10,7 @@ final class MetricaModel
 
     public function __construct()
     {
-        $this->db = Database::getInstance()->getConnection();
+        $this->db = Database::getInstance()->obtenerConexion();
     }
 
     public function obtenerClientePorId(int $clienteId): ?array
@@ -31,7 +31,7 @@ final class MetricaModel
         if (!$row || !isset($row['credenciales'])) {
             return null;
         }
-        $data = credencialesDescifrar((string)$row['credenciales']);
+        $data = descifrarCredenciales((string)$row['credenciales']);
         return !empty($data) ? $data : null;
     }
 
@@ -48,6 +48,7 @@ final class MetricaModel
             $stmt = $this->db->prepare($sql);
             $stmt->execute([$ok ? 1 : 0, $clienteId, $plataformaId]);
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             // best-effort: el estado del badge no debe romper la carga de metricas.
         }
     }
@@ -149,6 +150,7 @@ final class MetricaModel
             $this->db->commit();
             return true;
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             if ($this->db->inTransaction()) $this->db->rollBack();
             return false;
         }
@@ -177,55 +179,10 @@ final class MetricaModel
             $this->db->commit();
             return true;
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             if ($this->db->inTransaction()) $this->db->rollBack();
             return false;
         }
-    }
-
-    public function probarInsercionDebug(int $clienteId, array $metricas): array
-    {
-        $attempts = [];
-        $sql = 'INSERT INTO metricas (cliente_id, plataforma_id, fecha_metrica, nombre_metrica, valor, unidad, fecha_creacion)
-                SELECT ?, 5, ?, ?, ?, ?, NOW() FROM DUAL
-                WHERE NOT EXISTS (
-                   SELECT 1 FROM metricas
-                   WHERE cliente_id = ? AND plataforma_id = 5 AND nombre_metrica = ? AND fecha_creacion >= (NOW() - INTERVAL 7 DAY)
-                )';
-        $stmt = $this->db->prepare($sql);
-        $rolledBack = false;
-        try {
-            $this->db->beginTransaction();
-            foreach ($metricas as $m) {
-                $fecha = isset($m['fecha_metrica']) ? (string)$m['fecha_metrica'] : date('Y-m-d');
-                $nombre = (string)($m['nombre_metrica'] ?? '');
-                $valor = $m['valor'] ?? null;
-                $unidad = isset($m['unidad']) ? (string)$m['unidad'] : '';
-                $params = [$clienteId, $fecha, $nombre, is_numeric($valor) ? (float)$valor : null, $unidad, $clienteId, $nombre];
-                $ok = false; $err = null; $affected = 0;
-                try {
-                    if ($nombre !== '' && is_numeric($valor)) {
-                        $ok = $stmt->execute($params);
-                        $affected = $ok ? $stmt->rowCount() : 0;
-                    }
-                } catch (Throwable $e) {
-                    $err = $e->getMessage();
-                }
-                $attempts[] = [
-                    'nombre_metrica' => $nombre,
-                    'fecha_metrica' => $fecha,
-                    'valor' => is_numeric($valor) ? (float)$valor : null,
-                    'unidad' => $unidad,
-                    'sql' => $sql,
-                    'params' => $params,
-                    'executed' => $ok,
-                    'affected_rows' => $affected,
-                    'error' => $err,
-                ];
-            }
-        } finally {
-            if ($this->db->inTransaction()) { $this->db->rollBack(); $rolledBack = true; }
-        }
-        return ['attempts' => $attempts, 'transaction_rolled_back' => $rolledBack];
     }
 
     public function insertarRecomendacionML(int $clienteId, string $contenido): bool
@@ -239,6 +196,7 @@ final class MetricaModel
         try {
             return $stmt->execute([$clienteId, $contenido]);
         } catch (Throwable $e) {
+            error_log($e->getMessage());
             return false;
         }
     }

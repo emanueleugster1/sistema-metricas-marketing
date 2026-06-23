@@ -1,22 +1,10 @@
 <?php
 /*
- Vista pasiva. Recibe del controlador (ClienteController_paginaLista via renderView):
+ Vista pasiva. Recibe del controlador (ClienteController_paginaLista via renderizarVista):
    $clientes, $q, $totalClientes, $totalActivos, $breadcrumb.
 */
 
-/** Formato de "ultimo dato" en lenguaje relativo (solo presentacion). */
-function lista_tiempo_relativo(?string $fecha): string
-{
-    if ($fecha === null || $fecha === '') { return '—'; }
-    $ts = strtotime($fecha);
-    if ($ts === false) { return '—'; }
-    $dias = (int) floor((time() - $ts) / 86400);
-    if ($dias <= 0) { return 'hoy'; }
-    if ($dias === 1) { return 'ayer'; }
-    if ($dias < 30) { return 'hace ' . $dias . ' d'; }
-    $meses = (int) floor($dias / 30);
-    return $meses === 1 ? 'hace 1 mes' : 'hace ' . $meses . ' meses';
-}
+require_once __DIR__ . '/../../includes/fechaHelper.php';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -81,7 +69,7 @@ function lista_tiempo_relativo(?string $fecha): string
                   $activo = (int)$c['activo'] === 1;
                   $plataformas = !empty($c['plataformas_nombres']) ? explode(',', (string)$c['plataformas_nombres']) : [];
                   $tieneDashboard = (int)($c['tiene_dashboard'] ?? 0) === 1;
-                  $ultimo = lista_tiempo_relativo($c['ultima_metrica'] ?? null);
+                  $ultimo = formatearTiempoRelativo($c['ultima_metrica'] ?? null);
                 ?>
                 <tr>
                   <td class="cell-id"><?= str_pad((string)$id, 3, '0', STR_PAD_LEFT) ?></td>
