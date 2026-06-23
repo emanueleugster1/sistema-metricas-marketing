@@ -1,22 +1,9 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../includes/rolCheck.php';
-requerirAdministrador();
-require_once __DIR__ . '/../../controllers/usuarioController.php';
-
-$usuarios = UsuarioController_listar();
-$miId = (int)($_SESSION['usuario_id'] ?? 0);
-$total = count($usuarios);
-$activos = 0;
-foreach ($usuarios as $u) {
-    if ((int)$u['activo'] === 1) { $activos++; }
-}
-$flashInfo = isset($_SESSION['usuarios_info']) ? (string)$_SESSION['usuarios_info'] : '';
-$flashError = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
-unset($_SESSION['usuarios_info'], $_SESSION['usuarios_error']);
-$breadcrumb = ['Usuarios'];
+/*
+ Vista pasiva. Recibe del controlador (UsuarioController_paginaLista via renderView):
+   $usuarios, $miId, $total, $activos, $flashInfo, $flashError, $breadcrumb.
+   El guard de administrador se ejecuta en el controlador.
+*/
 ?>
 <!DOCTYPE html>
 <html lang="es">

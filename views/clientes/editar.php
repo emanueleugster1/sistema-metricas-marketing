@@ -1,24 +1,10 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../controllers/clienteController.php';
-$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
-$clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
-$error = isset($_GET['error']) ? (string)$_GET['error'] : null;
-$errorMsg = null;
-if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Verifique nombre y credenciales.'; }
-if ($error === 'not_found') { $errorMsg = 'Cliente no encontrado o sin permiso.'; }
-$cliente = $clienteId > 0 ? (ClienteController_obtener($clienteId, $agenciaId) ?? []) : [];
-$plataformas = ClienteController_plataformas();
-$camposPorPlataforma = [];
-foreach ($plataformas as $p) {
-    $camposPorPlataforma[(int)$p['id']] = ClienteController_plataforma_campos((int)$p['id']);
-}
-$credencialesMap = $clienteId > 0 ? ClienteController_cliente_credenciales($clienteId) : [];
-$validadaMap = $clienteId > 0 ? ClienteController_estado_credenciales($clienteId) : [];
-$isEdit = true;
-$breadcrumb = ['Clientes', 'Editar cliente'];
+/*
+ Vista pasiva. Recibe del controlador (ClienteController_paginaEditar via renderView):
+   $agenciaId, $clienteId, $error, $errorMsg, $cliente, $plataformas,
+   $camposPorPlataforma, $credencialesMap, $validadaMap, $isEdit, $breadcrumb.
+   El template cliente_form.php consume estas mismas variables.
+*/
 ?>
 <!DOCTYPE html>
 <html lang="es">

@@ -36,48 +36,54 @@ $_SESSION['ultima_actividad'] = $ahora; // renueva el contador en cada request v
 header('Cache-Control: no-store, no-cache, must-revalidate');
 header('Pragma: no-cache');
 
-$viewsDir  = __DIR__ . '/views/';
-$viewsReal = realpath($viewsDir);
-
 /**
- * Incluye una vista confinada a views/ (anti path-traversal).
+ * Carga una vista PASIVA confinada a views/ (anti path-traversal), inyectando en
+ * su scope las variables que prepara el controlador (contrato via extract()).
+ * Es el unico punto que incluye vistas: el flujo es router -> controlador -> vista.
  */
-$render = function (string $view) use ($viewsDir, $viewsReal): void {
+function renderView(string $view, array $data = []): void
+{
+    $viewsDir  = __DIR__ . '/views/';
+    $viewsReal = realpath($viewsDir);
     $target = realpath($viewsDir . $view);
     if ($target !== false && $viewsReal !== false && str_starts_with($target, $viewsReal) && is_file($target)) {
+        extract($data, EXTR_OVERWRITE);
         include $target;
     } else {
         http_response_code(500);
         echo 'Vista no disponible';
     }
     exit;
-};
+}
 
-// --- Tabla de rutas: metodo, patron del path, vista, params capturados ---
+// --- Tabla de rutas: metodo, patron del path, archivo de controlador, handler, params ---
+// Cada handler prepara los datos y carga la vista pasiva con renderView().
 $routes = [
-    ['GET', '#^/?$#',                         'dashboard/inicio.php',  []],
-    ['GET', '#^/dashboard/?$#',               'dashboard/inicio.php',  []],
-    ['GET', '#^/clientes/lista/?$#',          'clientes/lista.php',    []],
-    ['GET', '#^/clientes/crear/?$#',          'clientes/crear.php',    []],
-    ['GET', '#^/clientes/editar/(\d+)/?$#',   'clientes/editar.php',   ['cliente_id']],
-    ['GET', '#^/clientes/metricas/(\d+)/?$#', 'clientes/metricas.php', ['cliente_id']],
-    ['GET', '#^/usuarios/lista/?$#',          'usuarios/lista.php',    []],
-    ['GET', '#^/usuarios/crear/?$#',          'usuarios/crear.php',    []],
-    ['GET', '#^/usuarios/editar/(\d+)/?$#',   'usuarios/editar.php',   ['id']],
+    ['GET', '#^/?$#',                         'inicioController.php',  'InicioController_pagina',          []],
+    ['GET', '#^/dashboard/?$#',               'inicioController.php',  'InicioController_pagina',          []],
+    ['GET', '#^/clientes/lista/?$#',          'clienteController.php', 'ClienteController_paginaLista',    []],
+    ['GET', '#^/clientes/crear/?$#',          'clienteController.php', 'ClienteController_paginaCrear',    []],
+    ['GET', '#^/clientes/editar/(\d+)/?$#',   'clienteController.php', 'ClienteController_paginaEditar',   ['cliente_id']],
+    ['GET', '#^/clientes/metricas/(\d+)/?$#', 'metricaController.php', 'MetricaController_paginaMetricas', ['cliente_id']],
+    ['GET', '#^/usuarios/lista/?$#',          'usuarioController.php', 'UsuarioController_paginaLista',    []],
+    ['GET', '#^/usuarios/crear/?$#',          'usuarioController.php', 'UsuarioController_paginaCrear',    []],
+    ['GET', '#^/usuarios/editar/(\d+)/?$#',   'usuarioController.php', 'UsuarioController_paginaEditar',   ['id']],
 ];
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path   = (string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
-foreach ($routes as [$routeMethod, $pattern, $view, $params]) {
+foreach ($routes as [$routeMethod, $pattern, $ctrlFile, $handler, $params]) {
     if ($routeMethod !== $method || !preg_match($pattern, $path, $caps)) {
         continue;
     }
-    // Inyecta los parametros capturados en $_GET para que las vistas los lean igual que hoy.
+    // Inyecta los parametros capturados en $_GET para que el handler los lea igual que hoy.
     foreach ($params as $i => $name) {
         $_GET[$name] = $caps[$i + 1];
     }
-    $render($view);
+    require_once __DIR__ . '/controllers/' . $ctrlFile;
+    $handler();
+    exit;
 }
 
 http_response_code(404);

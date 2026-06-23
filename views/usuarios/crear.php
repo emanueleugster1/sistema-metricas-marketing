@@ -1,19 +1,9 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../includes/rolCheck.php';
-requerirAdministrador();
-require_once __DIR__ . '/../../controllers/usuarioController.php';
-
-$roles = UsuarioController_roles();
-$error = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
-$old = isset($_SESSION['usuarios_old']) && is_array($_SESSION['usuarios_old']) ? $_SESSION['usuarios_old'] : [];
-unset($_SESSION['usuarios_error'], $_SESSION['usuarios_old']);
-$nombreVal = (string)($old['nombre'] ?? '');
-$emailVal = (string)($old['email'] ?? '');
-$rolSel = (int)($old['rol_id'] ?? 0);
-$breadcrumb = ['Usuarios', 'Nuevo usuario'];
+/*
+ Vista pasiva. Recibe del controlador (UsuarioController_paginaCrear via renderView):
+   $roles, $error, $nombreVal, $emailVal, $rolSel, $breadcrumb.
+   El guard de administrador se ejecuta en el controlador.
+*/
 ?>
 <!DOCTYPE html>
 <html lang="es">

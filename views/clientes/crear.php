@@ -1,22 +1,10 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../controllers/clienteController.php';
-$error = isset($_GET['error']) ? (string)$_GET['error'] : null;
-$errorMsg = null;
-if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Complete nombre y credenciales.'; }
-if ($error === 'nombre_required') { $errorMsg = 'El nombre es obligatorio.'; }
-$plataformas = ClienteController_plataformas();
-$camposPorPlataforma = [];
-foreach ($plataformas as $p) {
-    $camposPorPlataforma[(int)$p['id']] = ClienteController_plataforma_campos((int)$p['id']);
-}
-$isEdit = false;
-$cliente = [];
-$credencialesMap = [];
-$validadaMap = [];
-$breadcrumb = ['Clientes', 'Nuevo cliente'];
+/*
+ Vista pasiva. Recibe del controlador (ClienteController_paginaCrear via renderView):
+   $error, $errorMsg, $plataformas, $camposPorPlataforma, $isEdit, $cliente,
+   $credencialesMap, $validadaMap, $breadcrumb. El template cliente_form.php consume
+   estas mismas variables.
+*/
 ?>
 <!DOCTYPE html>
 <html lang="es">

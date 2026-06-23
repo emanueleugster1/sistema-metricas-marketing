@@ -1,20 +1,8 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../controllers/clienteController.php';
-
-$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
-$q = isset($_GET['q']) ? trim((string)$_GET['q']) : null;
-$clientes = ClienteController_listarEnriquecido($agenciaId, $q, 100, 0);
-
-$totalClientes = count($clientes);
-$totalActivos = 0;
-foreach ($clientes as $c) {
-    if ((int)$c['activo'] === 1) { $totalActivos++; }
-}
-
-$breadcrumb = ['Clientes'];
+/*
+ Vista pasiva. Recibe del controlador (ClienteController_paginaLista via renderView):
+   $clientes, $q, $totalClientes, $totalActivos, $breadcrumb.
+*/
 
 /** Formato de "ultimo dato" en lenguaje relativo (solo presentacion). */
 function lista_tiempo_relativo(?string $fecha): string

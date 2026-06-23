@@ -1,16 +1,8 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../controllers/inicioController.php';
-
-$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
-$resumen = InicioController_resumen($agenciaId);
-$kpis = $resumen['kpis'];
-$atencion = $resumen['atencion'];
-$actividad = $resumen['actividad'];
-
-$breadcrumb = ['Inicio'];
+/*
+ Vista pasiva. Recibe del controlador (InicioController_pagina via renderView):
+   $kpis, $atencion, $actividad, $breadcrumb.
+*/
 
 /** Formato de fecha en lenguaje relativo (solo presentacion). */
 function dash_tiempo_relativo(?string $fecha): string

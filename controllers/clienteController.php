@@ -47,6 +47,91 @@ function ClienteController_estado_credenciales(int $cid): array
     return $model->obtenerValidadasPorCliente($cid);
 }
 
+// ===== Handlers de pagina (router -> controlador -> vista pasiva) =====
+
+/** Lista de clientes (vista clientes/lista.php). */
+function ClienteController_paginaLista(): void
+{
+    $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
+    $q = isset($_GET['q']) ? trim((string)$_GET['q']) : null;
+    $clientes = ClienteController_listarEnriquecido($agenciaId, $q, 100, 0);
+
+    $totalClientes = count($clientes);
+    $totalActivos = 0;
+    foreach ($clientes as $c) {
+        if ((int)$c['activo'] === 1) { $totalActivos++; }
+    }
+
+    renderView('clientes/lista.php', [
+        'clientes'      => $clientes,
+        'q'             => $q,
+        'totalClientes' => $totalClientes,
+        'totalActivos'  => $totalActivos,
+        'breadcrumb'    => ['Clientes'],
+    ]);
+}
+
+/** Alta de cliente (vista clientes/crear.php -> template cliente_form.php). */
+function ClienteController_paginaCrear(): void
+{
+    $error = isset($_GET['error']) ? (string)$_GET['error'] : null;
+    $errorMsg = null;
+    if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Complete nombre y credenciales.'; }
+    if ($error === 'nombre_required') { $errorMsg = 'El nombre es obligatorio.'; }
+
+    $plataformas = ClienteController_plataformas();
+    $camposPorPlataforma = [];
+    foreach ($plataformas as $p) {
+        $camposPorPlataforma[(int)$p['id']] = ClienteController_plataforma_campos((int)$p['id']);
+    }
+
+    renderView('clientes/crear.php', [
+        'error'               => $error,
+        'errorMsg'            => $errorMsg,
+        'plataformas'         => $plataformas,
+        'camposPorPlataforma' => $camposPorPlataforma,
+        'isEdit'              => false,
+        'cliente'             => [],
+        'credencialesMap'     => [],
+        'validadaMap'         => [],
+        'breadcrumb'          => ['Clientes', 'Nuevo cliente'],
+    ]);
+}
+
+/** Edicion de cliente (vista clientes/editar.php -> template cliente_form.php). */
+function ClienteController_paginaEditar(): void
+{
+    $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
+    $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
+    $error = isset($_GET['error']) ? (string)$_GET['error'] : null;
+    $errorMsg = null;
+    if ($error === 'invalid_payload') { $errorMsg = 'Datos inválidos. Verifique nombre y credenciales.'; }
+    if ($error === 'not_found') { $errorMsg = 'Cliente no encontrado o sin permiso.'; }
+
+    $cliente = $clienteId > 0 ? (ClienteController_obtener($clienteId, $agenciaId) ?? []) : [];
+    $plataformas = ClienteController_plataformas();
+    $camposPorPlataforma = [];
+    foreach ($plataformas as $p) {
+        $camposPorPlataforma[(int)$p['id']] = ClienteController_plataforma_campos((int)$p['id']);
+    }
+    $credencialesMap = $clienteId > 0 ? ClienteController_cliente_credenciales($clienteId) : [];
+    $validadaMap = $clienteId > 0 ? ClienteController_estado_credenciales($clienteId) : [];
+
+    renderView('clientes/editar.php', [
+        'agenciaId'           => $agenciaId,
+        'clienteId'           => $clienteId,
+        'error'               => $error,
+        'errorMsg'            => $errorMsg,
+        'cliente'             => $cliente,
+        'plataformas'         => $plataformas,
+        'camposPorPlataforma' => $camposPorPlataforma,
+        'credencialesMap'     => $credencialesMap,
+        'validadaMap'         => $validadaMap,
+        'isEdit'              => true,
+        'breadcrumb'          => ['Clientes', 'Editar cliente'],
+    ]);
+}
+
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((string)$_SERVER['SCRIPT_FILENAME'])) {
     session_start();
 

@@ -6,6 +6,7 @@ require_once __DIR__ . '/../models/metricaModel.php';
 require_once __DIR__ . '/../models/dashboardModel.php';
 require_once __DIR__ . '/dashboardController.php';
 require_once __DIR__ . '/../api/connectors/metaConnector.php';
+require_once __DIR__ . '/../includes/metaErrores.php';
 
 /** Devuelve la fecha del ultimo dato de metricas del cliente (solo lectura). */
 function MetricaController_ultima_fecha(int $clienteId): ?string
@@ -142,6 +143,93 @@ function MetricaController_liveAdsWindow(int $clienteId, int $dias): array
         $liveAds[$f] = ['valor' => $val, 'unidad' => $unidad];
     }
     return $liveAds;
+}
+
+/**
+ * Handler de pagina del dashboard de metricas (router -> controlador -> vista pasiva).
+ * Coordina los dos controladores (dashboard + metrica), arma el modelo del modal y
+ * traduce los errores Meta. La vista clientes/metricas.php solo presenta.
+ *
+ * IMPORTANTE: DashboardController_resumen() tiene efectos de escritura (extrae de
+ * Meta y persiste). Se invoca UNA SOLA VEZ aca.
+ */
+function MetricaController_paginaMetricas(): void
+{
+    $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
+    $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
+    // CAMBIO 1: rango del selector (whitelist {30,60,90}, default 30).
+    $diasRango = DashboardController_diasWhitelist($_GET['dias'] ?? 30);
+
+    // Llamada UNICA (efectos de escritura): extrae de Meta y persiste si corresponde.
+    $dashData = DashboardController_resumen($clienteId, $agenciaId, $diasRango);
+
+    $cliente = is_array($dashData) ? ($dashData['clienteInfo'] ?? null) : null;
+    $tieneDashboard = is_array($dashData) ? (bool)($dashData['hasDashboard'] ?? false) : false;
+    $dashboardInfo = is_array($dashData) ? ($dashData['dashboardInfo'] ?? null) : null;
+    $editMode = isset($_GET['edit']) && (int)$_GET['edit'] === 1;
+    $plataformasCliente = is_array($dashData) ? ($dashData['plataformas'] ?? []) : [];
+    $widgets = is_array($dashData) ? ($dashData['widgets'] ?? []) : [];
+    $errores = is_array($dashData) ? ($dashData['errores'] ?? []) : [];
+    $recomMl = is_array($dashData) ? (string)($dashData['recomendacion_ml'] ?? '') : '';
+    $visibleWidgets = array_filter($widgets, fn($w) => (int)($w['visible'] ?? 0) === 1);
+
+    // Cabecera (presentacion): estado de conexion y ultimo dato.
+    $metaConectada = false;
+    foreach ($plataformasCliente as $pl) {
+        if ((int)($pl['plataforma_id'] ?? 0) === 5) { $metaConectada = true; break; }
+    }
+    $ultimaFecha = MetricaController_ultima_fecha($clienteId);
+
+    // Traduccion de codigos de error Meta a mensajes (separa errores reales de avisos).
+    $erroresMeta = traducirErroresMeta($errores);
+
+    // Panel de recomendaciones: usa la ultima recomendacion persistida si existe.
+    $ultimaRec = is_array($dashData) ? ($dashData['ultima_recomendacion_ml'] ?? null) : null;
+    $recomContent = $ultimaRec ? (string)($ultimaRec['contenido'] ?? '') : $recomMl;
+
+    // --- Modelo del modal de dashboard (Crear / Personalizar) ---
+    $widgetsPorPlataforma = [];
+    foreach ($plataformasCliente as $plat) {
+        $pid = (int)$plat['plataforma_id'];
+        $widgetsPorPlataforma[$plat['nombre']] = DashboardController_widgetsDisponibles($pid);
+    }
+    if ($tieneDashboard) {
+        $mode = 'edit';
+        $formAction = '/controllers/dashboardController.php?action=actualizar_widgets';
+        $widgetsVisiblesIds = array_map(fn($w) => (int)$w['widget_id'], $widgets);
+        $clienteNombre = '';
+    } else {
+        $mode = 'create';
+        $formAction = '/controllers/dashboardController.php?action=crear';
+        $widgetsVisiblesIds = [];
+        $clienteNombre = $cliente ? (string)$cliente['nombre'] : '';
+    }
+
+    renderView('clientes/metricas.php', [
+        'clienteId'            => $clienteId,
+        'agenciaId'            => $agenciaId,
+        'diasRango'            => $diasRango,
+        'cliente'              => $cliente,
+        'tieneDashboard'       => $tieneDashboard,
+        'dashboardInfo'        => $dashboardInfo,
+        'editMode'             => $editMode,
+        'plataformasCliente'   => $plataformasCliente,
+        'widgets'              => $widgets,
+        'errores'              => $errores,
+        'recomMl'              => $recomMl,
+        'visibleWidgets'       => $visibleWidgets,
+        'metaConectada'        => $metaConectada,
+        'ultimaFecha'          => $ultimaFecha,
+        'erroresMeta'          => $erroresMeta,
+        'ultimaRec'            => $ultimaRec,
+        'recomContent'         => $recomContent,
+        'widgetsPorPlataforma' => $widgetsPorPlataforma,
+        'mode'                 => $mode,
+        'formAction'           => $formAction,
+        'widgetsVisiblesIds'   => $widgetsVisiblesIds,
+        'clienteNombre'        => $clienteNombre,
+        'breadcrumb'           => ['Clientes', 'Métricas'],
+    ]);
 }
 
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((string)$_SERVER['SCRIPT_FILENAME'])) {

@@ -16,3 +16,19 @@ function InicioController_resumen(int $agenciaId): array
         'actividad' => $model->actividadReciente($agenciaId, 6),
     ];
 }
+
+/**
+ * Handler de pagina (router -> controlador -> vista). Prepara el resumen y carga
+ * la vista pasiva dashboard/inicio.php con las variables que esta consume.
+ */
+function InicioController_pagina(): void
+{
+    $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
+    $resumen = InicioController_resumen($agenciaId);
+    renderView('dashboard/inicio.php', [
+        'kpis'       => $resumen['kpis'],
+        'atencion'   => $resumen['atencion'],
+        'actividad'  => $resumen['actividad'],
+        'breadcrumb' => ['Inicio'],
+    ]);
+}

@@ -1,24 +1,9 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-require_once __DIR__ . '/../../includes/rolCheck.php';
-requerirAdministrador();
-require_once __DIR__ . '/../../controllers/usuarioController.php';
-
-$id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-$usuario = UsuarioController_obtener($id);
-if ($usuario === null) {
-    header('Location: /usuarios/lista');
-    exit;
-}
-$roles = UsuarioController_roles();
-$miId = (int)($_SESSION['usuario_id'] ?? 0);
-$esYo = ($id === $miId);
-$error = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
-unset($_SESSION['usuarios_error']);
-$rolActual = (int)($usuario['rol_id'] ?? 0);
-$breadcrumb = ['Usuarios', 'Editar usuario'];
+/*
+ Vista pasiva. Recibe del controlador (UsuarioController_paginaEditar via renderView):
+   $id, $usuario, $roles, $miId, $esYo, $error, $rolActual, $breadcrumb.
+   El guard de administrador y el redirect de usuario-null se ejecutan en el controlador.
+*/
 ?>
 <!DOCTYPE html>
 <html lang="es">

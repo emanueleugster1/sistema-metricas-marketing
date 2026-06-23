@@ -27,6 +27,84 @@ function UsuarioController_obtener(int $id): ?array
     return (new UsuarioModel())->obtenerUsuario($id);
 }
 
+// ===== Handlers de pagina (router -> controlador -> vista pasiva) =====
+// Todas las paginas de gestion son solo-admin: el guard requerirAdministrador()
+// se ejecuta aca (antes era responsabilidad de la vista).
+
+/** Listado de usuarios (vista usuarios/lista.php). */
+function UsuarioController_paginaLista(): void
+{
+    requerirAdministrador();
+    $usuarios = UsuarioController_listar();
+    $miId = (int)($_SESSION['usuario_id'] ?? 0);
+    $total = count($usuarios);
+    $activos = 0;
+    foreach ($usuarios as $u) {
+        if ((int)$u['activo'] === 1) { $activos++; }
+    }
+    $flashInfo = isset($_SESSION['usuarios_info']) ? (string)$_SESSION['usuarios_info'] : '';
+    $flashError = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
+    unset($_SESSION['usuarios_info'], $_SESSION['usuarios_error']);
+
+    renderView('usuarios/lista.php', [
+        'usuarios'   => $usuarios,
+        'miId'       => $miId,
+        'total'      => $total,
+        'activos'    => $activos,
+        'flashInfo'  => $flashInfo,
+        'flashError' => $flashError,
+        'breadcrumb' => ['Usuarios'],
+    ]);
+}
+
+/** Alta de usuario (vista usuarios/crear.php). */
+function UsuarioController_paginaCrear(): void
+{
+    requerirAdministrador();
+    $roles = UsuarioController_roles();
+    $error = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
+    $old = isset($_SESSION['usuarios_old']) && is_array($_SESSION['usuarios_old']) ? $_SESSION['usuarios_old'] : [];
+    unset($_SESSION['usuarios_error'], $_SESSION['usuarios_old']);
+
+    renderView('usuarios/crear.php', [
+        'roles'      => $roles,
+        'error'      => $error,
+        'nombreVal'  => (string)($old['nombre'] ?? ''),
+        'emailVal'   => (string)($old['email'] ?? ''),
+        'rolSel'     => (int)($old['rol_id'] ?? 0),
+        'breadcrumb' => ['Usuarios', 'Nuevo usuario'],
+    ]);
+}
+
+/** Edicion de usuario (vista usuarios/editar.php). */
+function UsuarioController_paginaEditar(): void
+{
+    requerirAdministrador();
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+    $usuario = UsuarioController_obtener($id);
+    if ($usuario === null) {
+        header('Location: /usuarios/lista');
+        exit;
+    }
+    $roles = UsuarioController_roles();
+    $miId = (int)($_SESSION['usuario_id'] ?? 0);
+    $esYo = ($id === $miId);
+    $error = isset($_SESSION['usuarios_error']) ? (string)$_SESSION['usuarios_error'] : '';
+    unset($_SESSION['usuarios_error']);
+    $rolActual = (int)($usuario['rol_id'] ?? 0);
+
+    renderView('usuarios/editar.php', [
+        'id'         => $id,
+        'usuario'    => $usuario,
+        'roles'      => $roles,
+        'miId'       => $miId,
+        'esYo'       => $esYo,
+        'error'      => $error,
+        'rolActual'  => $rolActual,
+        'breadcrumb' => ['Usuarios', 'Editar usuario'],
+    ]);
+}
+
 if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((string)$_SERVER['SCRIPT_FILENAME'])) {
     session_start();
 

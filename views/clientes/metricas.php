@@ -1,33 +1,12 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
-
-require_once __DIR__ . '/../../controllers/dashboardController.php';
-require_once __DIR__ . '/../../controllers/metricaController.php';
-require_once __DIR__ . '/../../includes/metaErrores.php';
-
-$clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
-$agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
-// CAMBIO 1: rango del selector (whitelist {30,60,90}, default 30).
-$diasRango = DashboardController_diasWhitelist($_GET['dias'] ?? 30);
-$dashData = DashboardController_resumen($clienteId, $agenciaId, $diasRango);
-
-$cliente = is_array($dashData) ? ($dashData['clienteInfo'] ?? null) : null;
-$tieneDashboard = is_array($dashData) ? (bool)($dashData['hasDashboard'] ?? false) : false;
-$dashboardInfo = is_array($dashData) ? ($dashData['dashboardInfo'] ?? null) : null;
-$editMode = isset($_GET['edit']) && (int)$_GET['edit'] === 1;
-$plataformasCliente = is_array($dashData) ? ($dashData['plataformas'] ?? []) : [];
-$widgets = is_array($dashData) ? ($dashData['widgets'] ?? []) : [];
-$errores = is_array($dashData) ? ($dashData['errores'] ?? []) : [];
-$recomMl = is_array($dashData) ? (string)($dashData['recomendacion_ml'] ?? '') : '';
-$visibleWidgets = array_filter($widgets, fn($w) => (int)($w['visible'] ?? 0) === 1);
-
-// --- Datos de cabecera (presentacion): estado de conexion y ultimo dato ---
-$breadcrumb = ['Clientes', 'Métricas'];
-$metaConectada = false;
-foreach ($plataformasCliente as $pl) {
-    if ((int)($pl['plataforma_id'] ?? 0) === 5) { $metaConectada = true; break; }
-}
-$ultimaFecha = MetricaController_ultima_fecha($clienteId);
+/*
+ Vista pasiva. Recibe del controlador (MetricaController_paginaMetricas via renderView):
+   $clienteId, $agenciaId, $diasRango, $cliente, $tieneDashboard, $dashboardInfo,
+   $editMode, $plataformasCliente, $widgets, $errores, $recomMl, $visibleWidgets,
+   $metaConectada, $ultimaFecha, $erroresMeta, $ultimaRec, $recomContent,
+   $widgetsPorPlataforma, $mode, $formAction, $widgetsVisiblesIds, $clienteNombre,
+   $breadcrumb.
+*/
 
 function metricas_rel(?string $fecha): string {
     if ($fecha === null || $fecha === '') { return '—'; }
@@ -88,11 +67,6 @@ function metricas_rel(?string $fecha): string {
       </div>
     </header>
 
-    <?php
-      // Fix 2: traducir los codigos de error a lenguaje claro, separando los fallos
-      // reales (que el usuario debe atender) de las ausencias normales (informativas).
-      $erroresMeta = traducirErroresMeta($errores);
-    ?>
     <?php if (!empty($erroresMeta['errores'])): ?>
       <section class="panel" style="border-left: 3px solid var(--color-danger);">
         <div class="panel-header">
@@ -185,7 +159,6 @@ function metricas_rel(?string $fecha): string {
     <div class="panel-header">
       <h2 class="panel-title"><i class="bi bi-stars"></i> Análisis y recomendaciones</h2>
     </div>
-    <?php $ultimaRec = is_array($dashData) ? ($dashData['ultima_recomendacion_ml'] ?? null) : null; $recomContent = $ultimaRec ? (string)($ultimaRec['contenido'] ?? '') : $recomMl; ?>
     <div class="panel-body recom-body"><?php
     if ($recomContent !== '') {
         echo nl2br(htmlspecialchars($recomContent, ENT_QUOTES, 'UTF-8'));
@@ -195,30 +168,9 @@ function metricas_rel(?string $fecha): string {
 ?></div>
   </section>
     
-    <!-- Modal de Dashboard (Crear / Editar) -->
-    <?php 
-        // Preparación de variables para el template
-        $widgetsPorPlataforma = [];
-        foreach ($plataformasCliente as $plat) {
-            $pid = (int)$plat['plataforma_id'];
-            $disp = DashboardController_widgetsDisponibles($pid);
-            $widgetsPorPlataforma[$plat['nombre']] = $disp;
-        }
-
-        if ($tieneDashboard) {
-            $mode = 'edit';
-            $formAction = '/controllers/dashboardController.php?action=actualizar_widgets';
-            $widgetsVisiblesIds = array_map(fn($w) => (int)$w['widget_id'], $widgets);
-            $clienteNombre = ''; 
-        } else {
-            $mode = 'create';
-            $formAction = '/controllers/dashboardController.php?action=crear';
-            $widgetsVisiblesIds = [];
-            $clienteNombre = $cliente ? (string)$cliente['nombre'] : '';
-        }
-        
-        require __DIR__ . '/../../views/templates/dashboard_form.php';
-    ?>
+    <!-- Modal de Dashboard (Crear / Editar). El modelo del modal ($mode, $formAction,
+         $widgetsPorPlataforma, $widgetsVisiblesIds, $clienteNombre) lo prepara el controlador. -->
+    <?php require __DIR__ . '/../../views/templates/dashboard_form.php'; ?>
 
   </main>
   </div>
