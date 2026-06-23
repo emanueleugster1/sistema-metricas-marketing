@@ -183,12 +183,12 @@ class UsuarioModel
     }
 
     /** Crea un usuario con su rol. */
-    public function crearUsuario(string $nombre, string $email, string $passwordHash, int $rolId): bool
+    public function crearUsuario(string $nombre, string $email, string $passwordHash, int $rolId, int $agenciaId): bool
     {
-        $sql = 'INSERT INTO usuarios (nombre, email, password_hash, rol_id, fecha_creacion, fecha_actualizacion)
-                VALUES (?, ?, ?, ?, NOW(), NOW())';
+        $sql = 'INSERT INTO usuarios (nombre, email, password_hash, rol_id, agencia_id, fecha_creacion, fecha_actualizacion)
+                VALUES (?, ?, ?, ?, ?, NOW(), NOW())';
         $stmt = $this->db->prepare($sql);
-        return $stmt->execute([$nombre, $email, $passwordHash, $rolId]);
+        return $stmt->execute([$nombre, $email, $passwordHash, $rolId, $agenciaId]);
     }
 
     /** Actualiza nombre y rol de un usuario (el email no se modifica). */

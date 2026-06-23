@@ -154,8 +154,19 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             exit;
         }
 
+        // Pertenencia por agencia: el usuario nuevo hereda la agencia del admin que lo
+        // crea. Si la sesion del admin no tiene agencia valida (>0), abortamos en vez de
+        // crear un usuario huerfano (agencia_id NULL/0 -> no veria ningun cliente).
+        $agenciaId = (int)($_SESSION['agencia_id'] ?? 0);
+        if ($agenciaId <= 0) {
+            $_SESSION['usuarios_error'] = 'No se pudo determinar la agencia. Volvé a iniciar sesión e intentá de nuevo.';
+            $_SESSION['usuarios_old'] = ['nombre' => $nombre, 'email' => $email, 'rol_id' => $rolId];
+            header('Location: /usuarios/crear');
+            exit;
+        }
+
         $hash = password_hash($password, PASSWORD_DEFAULT);
-        if ($model->crearUsuario($nombre, $email, $hash, $rolId)) {
+        if ($model->crearUsuario($nombre, $email, $hash, $rolId, $agenciaId)) {
             $_SESSION['usuarios_info'] = 'Usuario creado correctamente.';
             header('Location: /usuarios/lista');
             exit;
