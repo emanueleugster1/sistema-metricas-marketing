@@ -54,3 +54,4 @@ $inicialUsuario = strtoupper(mb_substr($nombreUsuario, 0, 1, 'UTF-8'));
     </a>
   </div>
 </aside>
+<script src="/assets/js/templates/sidebar.js"></script>
