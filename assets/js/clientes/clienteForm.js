@@ -40,10 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
       
       const submitBtn = form.querySelector('button[type="submit"]');
       const originalText = submitBtn.textContent;
-      
+
       // Mostrar loading
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="bi bi-arrow-repeat spinner"></i> Guardando...';
+      if (window.PageLoading) window.PageLoading.show();
       
       try {
         const formData = new FormData(form);

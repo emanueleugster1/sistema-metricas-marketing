@@ -9,3 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
     window.location.href = `/clientes/lista${params.toString() ? '?' + params.toString() : ''}`;
   });
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('a[href^="/clientes/metricas/"]').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.PageLoading) window.PageLoading.show();
+    });
+  });
+});

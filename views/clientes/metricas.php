@@ -45,7 +45,7 @@ require_once __DIR__ . '/../../includes/fechaHelper.php';
         <?php if ($tieneDashboard): ?>
           <label for="rango-dias-select" class="sr-only">Rango de fechas</label>
           <select id="rango-dias-select" class="btn btn-secondary no-global-loading" aria-label="Rango de fechas">
-            <?php foreach ([30, 60, 90] as $opt): ?>
+            <?php foreach ([28, 60, 90] as $opt): ?>
               <option value="<?= $opt ?>" <?= $diasRango === $opt ? 'selected' : '' ?>>Últimos <?= $opt ?> días</option>
             <?php endforeach; ?>
           </select>
@@ -89,9 +89,15 @@ require_once __DIR__ . '/../../includes/fechaHelper.php';
             $metricaPrincipal = (string)$widget['metrica_principal'];
           ?>
 
-          <div class="card" data-widget-id="<?= $widgetId ?>" data-metric="<?= htmlspecialchars($metricaPrincipal) ?>" data-tipo="<?= htmlspecialchars($tipoVis) ?>">
+          <?php
+            $metricasPuntuales = ['followers_fb', 'followers_ig', 'campaigns_activas', 'instagram_posts', 'page_posts'];
+            $subLabel = ($tipoVis === 'feed' || in_array($metricaPrincipal, $metricasPuntuales, true))
+                ? $descripcion
+                : 'Últimos ' . $diasRango . ' días';
+          ?>
+          <div class="card<?= $tipoVis === 'feed' ? ' card-feed' : '' ?>" data-widget-id="<?= $widgetId ?>" data-metric="<?= htmlspecialchars($metricaPrincipal) ?>" data-tipo="<?= htmlspecialchars($tipoVis) ?>">
             <div class="card-title"><?= $nombre ?></div>
-            <div class="card-sub"><?= $descripcion ?></div>
+            <div class="card-sub"><?= htmlspecialchars($subLabel, ENT_QUOTES, 'UTF-8') ?></div>
             
             <?php if ($tipoVis === 'chart'): ?>
               <div class="chart-container">
@@ -127,6 +133,13 @@ require_once __DIR__ . '/../../includes/fechaHelper.php';
                 </div>
               </div>
             
+            <?php elseif ($tipoVis === 'feed'): ?>
+              <div class="feed-container" id="feed-<?= $widgetId ?>">
+                <div class="spinner-container spinner-pad">
+                  <div class="spinner-border"></div>
+                </div>
+              </div>
+
             <?php else: ?>
               <div class="default-container">
                 <p>Tipo de visualización no soportado: <?= htmlspecialchars($tipoVis) ?></p>
@@ -151,7 +164,17 @@ require_once __DIR__ . '/../../includes/fechaHelper.php';
     </div>
     <div class="panel-body recom-body"><?php
     if ($recomContent !== '') {
-        echo nl2br(htmlspecialchars($recomContent, ENT_QUOTES, 'UTF-8'));
+        // El texto viene de Gemini con HTML de formato (Gemini usa <b>,<i>; saltos de linea \n).
+        // Se renderiza como HTML, pero SANITIZADO: strip_tags deja SOLO la whitelist de etiquetas
+        // de formato (sin atributos) y elimina todo lo demas (<script>,<a>,<img>,on*...). nl2br
+        // conserva los saltos de linea. NO renderizar HTML crudo de fuente externa sin filtrar.
+        $etiquetasPermitidas = '<b><strong><i><em><br><ul><li><p>';
+        $recomLimpio = strip_tags($recomContent, $etiquetasPermitidas);
+        // Defensa extra: las etiquetas permitidas son de formato y NO llevan atributos; strip_tags
+        // deja pasar atributos dentro de una etiqueta permitida (p.ej. <b onclick=...>). Los quitamos
+        // para cerrar el vector XSS por atributos / on* handlers.
+        $recomLimpio = preg_replace('#<(/?)(b|strong|i|em|br|ul|li|p)\b[^>]*>#i', '<$1$2>', $recomLimpio);
+        echo str_replace(["\r\n", "\r", "\n"], '', $recomLimpio);
     } else {
         echo '<span class="cell-empty">Sin datos suficientes</span>';
     }

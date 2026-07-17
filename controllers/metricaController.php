@@ -15,81 +15,12 @@ function MetricaController_obtenerUltimaFecha(int $clienteId): ?string
     return $model->obtenerUltimaFecha($clienteId);
 }
 
-function MetricaController_obtenerResumen(int $clienteId, int $agenciaId, int $dias = 30): array
-{
-    $dias = DashboardController_normalizarDias($dias);
-    $adsTimeRange = DashboardController_calcularRangoDias($dias);
-    $model = new MetricaModel();
-    $cliente = $model->obtenerClientePorId($clienteId);
-    if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
-        return ['success' => false, 'error' => 'not_found_or_forbidden'];
-    }
-    $errores = [];
-    $cred = $model->obtenerCredencialesMeta($clienteId);
-    if ($cred === null) {
-        $errores[] = 'sin_credenciales_meta';
-    }
-    $metricasReales = [
-        'page_posts' => [],
-        'instagram_posts' => [],
-        'insights_30d' => [],
-        'campaigns_activas' => [],
-        'page_insights' => [],
-        'ig_insights' => [],
-    ];
-    if (is_array($cred)) {
-        $accessToken = (string)($cred['access_token'] ?? '');
-        $pageId = (string)($cred['page_id'] ?? '');
-        $adAccountId = (string)($cred['ad_account_id'] ?? '');
-        $igBusinessId = (string)($cred['instagram_business_account_id'] ?? '');
-        if ($accessToken === '') {
-            $errores[] = 'token_meta_faltante';
-        } else {
-            $meta = new MetaConnector();
-            $valid = $meta->validateToken($accessToken);
-            if (!$valid['success']) {
-                $errores[] = 'token_meta_invalido';
-            } else {
-                if ($pageId !== '') {
-                    $pp = $meta->pagePosts($accessToken, $pageId, limit: 50);
-                    if ($pp['success']) { $metricasReales['page_posts'] = $pp['data']['data'] ?? []; } else { $errores[] = 'page_posts_error'; }
-                } else { $errores[] = 'page_id_faltante'; }
-                if ($igBusinessId !== '') {
-                    $ip = $meta->instagramPosts($accessToken, $igBusinessId, 50);
-                    if ($ip['success']) { $metricasReales['instagram_posts'] = $ip['data']['data'] ?? []; } else { $errores[] = 'instagram_posts_error'; }
-                } else { $errores[] = 'instagram_business_account_id_faltante'; }
-                if ($adAccountId !== '') {
-                    $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'], $adsTimeRange);
-                    if ($ins['success']) { $metricasReales['insights_30d'] = $ins['data']['data'] ?? []; } else { $errores[] = 'insights_error'; }
-                    $camps = $meta->campaigns($accessToken, $adAccountId, 'ACTIVE');
-                    if ($camps['success']) { $metricasReales['campaigns_activas'] = $camps['data']['data'] ?? []; } else { $errores[] = 'campaigns_error'; }
-                } else { $errores[] = 'ad_account_id_faltante'; }
-                if ($pageId !== '') {
-                    $pis = $meta->pageInsights($accessToken, $pageId, ['page_impressions','page_engaged_users','page_fans'], 'days_28');
-                    if ($pis['success']) { $metricasReales['page_insights'] = $pis['data']['data'] ?? []; } else { $errores[] = 'page_insights_error'; }
-                }
-                if ($igBusinessId !== '') {
-                    $iis = $meta->instagramUserInsights($accessToken, $igBusinessId, ['impressions','reach','profile_views','follower_count'], 'day');
-                    if ($iis['success']) { $metricasReales['ig_insights'] = $iis['data']['data'] ?? []; } else { $errores[] = 'ig_insights_error'; }
-                }
-            }
-        }
-    }
-    $historicas = $model->obtenerMetricasHistoricas($clienteId, dias: 30);
-    return [
-        'success' => true,
-        'infoCliente' => $cliente,
-        'metricasReales' => $metricasReales,
-        'metricasHistoricas' => $historicas,
-        'errores' => $errores,
-    ];
-}
 /**
  * CAMBIO 1: agrega ads insights EN VIVO sobre la ventana elegida (60/90 dias) para
  * alimentar las tarjetas tipo 'metric' de ads. Devuelve [metrica => {valor, unidad}].
  *
- * - Solo actua si $dias != 30 (a 30 dias las tarjetas siguen viniendo de la serie
- *   persistida: comportamiento previo intacto). Para 30 devuelve [] (vacio).
+ * - Solo actua si $dias != 28 (a 28 dias las tarjetas vienen de la serie persistida).
+ *   Para 28 devuelve [] (vacio): los datos vienen del historico guardado en BD.
  * - NO persiste nada: es una lectura efimera para presentacion.
  * - Misma escala que la serie persistida (unidad=moneda para spend/cpc/cpm; el ctr
  *   de Meta ya viene como porcentaje, se usa tal cual con unidad '%').
@@ -98,7 +29,7 @@ function MetricaController_obtenerResumen(int $clienteId, int $agenciaId, int $d
  */
 function MetricaController_obtenerVentanaAdsEnVivo(int $clienteId, int $dias): array
 {
-    if ($dias === 30) {
+    if ($dias === 28) {
         return [];
     }
     $model = new MetricaModel();
@@ -118,7 +49,7 @@ function MetricaController_obtenerVentanaAdsEnVivo(int $clienteId, int $dias): a
     }
     $timeRange = DashboardController_calcularRangoDias($dias);
     $adsFields = ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'];
-    $ins = $meta->insights($token, $adAccountId, 'last_30d', $adsFields, $timeRange);
+    $ins = $meta->insights($token, $adAccountId, 'last_28d', $adsFields, $timeRange);
     if (!($ins['success'] ?? false) || empty($ins['data']['data'])) {
         return [];
     }
@@ -158,7 +89,7 @@ function MetricaController_paginaMetricas(): void
     $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
     $agenciaId = isset($_SESSION['agencia_id']) ? (int)$_SESSION['agencia_id'] : 0;
     // CAMBIO 1: rango del selector (whitelist {30,60,90}, default 30).
-    $diasRango = DashboardController_normalizarDias($_GET['dias'] ?? 30);
+    $diasRango = DashboardController_normalizarDias($_GET['dias'] ?? 28);
 
     // Llamada UNICA (efectos de escritura): extrae de Meta y persiste si corresponde.
     $dashData = DashboardController_obtenerResumen($clienteId, $agenciaId, $diasRango);
@@ -247,24 +178,11 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
     $model = new MetricaModel();
     $agenciaId = (int)($_SESSION['agencia_id'] ?? 0);
 
-    if ($method === 'GET' && $action === 'resumen') {
-        header('Content-Type: application/json');
-        $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
-        if ($clienteId <= 0) {
-            echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
-            exit;
-        }
-
-        $data = MetricaController_obtenerResumen($clienteId, $agenciaId);
-        echo json_encode($data);
-        exit;
-    }
-
     if ($method === 'GET' && $action === 'widgets_data') {
         header('Content-Type: application/json');
         $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
         // CAMBIO 1: rango del selector, whitelist {30,60,90}, default 30.
-        $dias = DashboardController_normalizarDias($_GET['dias'] ?? 30);
+        $dias = DashboardController_normalizarDias($_GET['dias'] ?? 28);
 
         if ($clienteId <= 0) {
             echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
@@ -308,6 +226,54 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
             'metricasHistoricas' => $metricasHistoricas,
             'liveAds' => $liveAds
         ]);
+        exit;
+    }
+
+    if ($method === 'GET' && $action === 'feed_ig') {
+        header('Content-Type: application/json');
+        $clienteId = isset($_GET['cliente_id']) ? (int)$_GET['cliente_id'] : 0;
+        if ($clienteId <= 0) {
+            echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']); exit;
+        }
+        // Gate de agencia: mismo patrón que widgets_data (línea 193).
+        $clienteGate = $model->obtenerClientePorId($clienteId);
+        if ($clienteGate === null || (int)($clienteGate['agencia_id'] ?? 0) !== $agenciaId) {
+            echo json_encode(['success' => false, 'error' => 'forbidden']); exit;
+        }
+        $cred = $model->obtenerCredencialesMeta($clienteId);
+        if (!is_array($cred)) {
+            echo json_encode(['success' => false, 'error' => 'no_meta_credentials']); exit;
+        }
+        $token        = (string)($cred['access_token'] ?? '');
+        $igBusinessId = (string)($cred['instagram_business_account_id'] ?? '');
+        if ($token === '') {
+            echo json_encode(['success' => false, 'error' => 'no_token']); exit;
+        }
+        $meta = new MetaConnector();
+        // Si el ig_id no está persistido en credenciales, derivarlo al vuelo desde la página.
+        if ($igBusinessId === '') {
+            $pageId = (string)($cred['page_id'] ?? '');
+            if ($pageId !== '') {
+                $igRes = $meta->getInstagramBusinessIdForPage($token, $pageId);
+                if ($igRes['success'] ?? false) {
+                    $igBusinessId = (string)($igRes['instagram_business_account_id'] ?? '');
+                }
+            }
+        }
+        if ($igBusinessId === '') {
+            echo json_encode(['success' => false, 'error' => 'no_ig_account']); exit;
+        }
+        $resp = $meta->instagramPosts($token, $igBusinessId, 10);
+        if (!($resp['success'] ?? false)) {
+            echo json_encode(['success' => false, 'error' => 'meta_error',
+                              'detail' => $resp['message'] ?? null]); exit;
+        }
+        $posts = $resp['data']['data'] ?? [];
+        usort($posts, fn($a, $b) =>
+            ((int)($b['like_count'] ?? 0) + (int)($b['comments_count'] ?? 0))
+            - ((int)($a['like_count'] ?? 0) + (int)($a['comments_count'] ?? 0))
+        );
+        echo json_encode(['success' => true, 'posts' => $posts]);
         exit;
     }
 
