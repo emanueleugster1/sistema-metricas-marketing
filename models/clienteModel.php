@@ -121,7 +121,11 @@ class ClienteModel
         return is_array($rows) ? $rows : [];
     }
 
-    public function crearClienteConCredenciales(int $usuarioId, int $agenciaId, string $nombre, ?string $sector, bool $activo, array $credencialesPorPlataforma): bool
+    /**
+     * Crea el cliente con sus credenciales cifradas. Devuelve el ID nuevo (>0) en exito, o 0 en
+     * fallo. (FASE A: el controller necesita el clienteId para disparar el backfill al conectar.)
+     */
+    public function crearClienteConCredenciales(int $usuarioId, int $agenciaId, string $nombre, ?string $sector, bool $activo, array $credencialesPorPlataforma): int
     {
         $this->db->beginTransaction();
         try {
@@ -131,7 +135,7 @@ class ClienteModel
             $okCliente = $stmtCliente->execute([$usuarioId, $agenciaId, $nombre, $sector, $activo ? 1 : 0]);
             if (!$okCliente) {
                 $this->db->rollBack();
-                return false;
+                return 0;
             }
             $clienteId = (int)$this->db->lastInsertId();
 
@@ -144,18 +148,18 @@ class ClienteModel
                 $ok = $stmtCred->execute([$clienteId, (int)$plataformaId, $blob]);
                 if (!$ok) {
                     $this->db->rollBack();
-                    return false;
+                    return 0;
                 }
             }
 
             $this->db->commit();
-            return true;
+            return $clienteId;
         } catch (Throwable $e) {
             error_log($e->getMessage());
             if ($this->db->inTransaction()) {
                 $this->db->rollBack();
             }
-            return false;
+            return 0;
         }
     }
 

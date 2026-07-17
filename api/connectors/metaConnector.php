@@ -100,11 +100,11 @@ class MetaConnector
         $act = $this->normalizeAccountId($adAccountId);
         $fields = 'id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,updated_time';
         $params = ['fields' => $fields, 'limit' => 50, 'access_token' => $accessToken];
-        if ($status) $params['effective_status'] = $status;
+        if ($status) $params['effective_status'] = json_encode([$status]);
         return $this->request($act . '/campaigns', $params);
     }
 
-    public function insights(string $accessToken, string $adAccountId, string $datePreset = 'last_30d', array $fields = ['impressions','clicks','spend'], ?array $timeRange = null): array
+    public function insights(string $accessToken, string $adAccountId, string $datePreset = 'last_30d', array $fields = ['impressions','clicks','spend'], ?array $timeRange = null, ?int $timeIncrement = null): array
     {
         $act = $this->normalizeAccountId($adAccountId);
         $params = ['fields' => implode(',', $fields), 'access_token' => $accessToken];
@@ -115,6 +115,9 @@ class MetaConnector
             $params['time_range'] = json_encode(['since' => $timeRange['since'], 'until' => $timeRange['until']]);
         } else {
             $params['date_preset'] = $datePreset;
+        }
+        if ($timeIncrement !== null) {
+            $params['time_increment'] = $timeIncrement;
         }
         return $this->request($act . '/insights', $params);
     }
@@ -256,14 +259,42 @@ class MetaConnector
 
     public function instagramPosts(string $accessToken, string $instagramBusinessId, int $limit = 10): array
     {
-        $fields = 'id,caption,media_type,permalink,timestamp,like_count';
+        // FASE 5C: feed IG EN VIVO para mostrar (ranking de contenido), NO para el ML y NO se
+        // persiste. Se agrega comments_count para completar el engagement por post (like_count
+        // ya estaba). caption/permalink/media_type viajan solo para presentacion: NO se guardan.
+        $fields = 'id,caption,media_type,timestamp,permalink,like_count,comments_count,media_url,thumbnail_url';
         return $this->request($instagramBusinessId . '/media', ['fields' => $fields, 'limit' => $limit, 'access_token' => $accessToken]);
     }
 
-    public function pageInsights(string $accessToken, string $pageId, array $metrics = ['page_impressions','page_engaged_users','page_fans'], string $period = 'days_28'): array
+    public function pageInsights(string $accessToken, string $pageId, array $metrics = ['page_impressions','page_engaged_users','page_fans'], string $period = 'days_28', ?array $timeRange = null): array
     {
         $params = ['metric' => implode(',', $metrics), 'period' => $period, 'access_token' => $accessToken];
+        // FASE 4: ventana explicita. Page Insights usa since/until (NO time_range JSON como ads).
+        // Opcional: sin el (default null) se conserva el comportamiento original (ventana del period).
+        if ($timeRange !== null && isset($timeRange['since'], $timeRange['until'])) {
+            $params['since'] = $timeRange['since'];
+            $params['until'] = $timeRange['until'];
+        }
         return $this->request($pageId . '/insights', $params);
+    }
+
+    /**
+     * FASE 5B: snapshot de followers de la pagina FB (campo directo, NO insight).
+     * fan_count = "me gusta" historicos; followers_count = seguidores actuales.
+     * Requiere Page Access Token (igual que pageInsights/pagePosts).
+     */
+    public function pageFollowers(string $accessToken, string $pageId): array
+    {
+        return $this->request($pageId, ['fields' => 'fan_count,followers_count', 'access_token' => $accessToken]);
+    }
+
+    /**
+     * FASE 5B: snapshot de la cuenta IG (campo directo, NO insight): followers_count y media_count.
+     * El igUserId se deriva de la pagina (getInstagramBusinessIdForPage) si no esta persistido.
+     */
+    public function instagramAccountInfo(string $accessToken, string $igUserId): array
+    {
+        return $this->request($igUserId, ['fields' => 'followers_count,media_count', 'access_token' => $accessToken]);
     }
 
     public function instagramUserInsights(string $accessToken, string $igUserId, array $metrics = ['impressions','reach','profile_views','follower_count'], string $period = 'day'): array

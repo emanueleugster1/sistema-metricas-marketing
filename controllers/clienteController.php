@@ -4,6 +4,23 @@ declare(strict_types=1);
 require_once __DIR__ . '/../config/databaseConfig.php';
 require_once __DIR__ . '/../models/clienteModel.php';
 require_once __DIR__ . '/../api/connectors/metaConnector.php';
+require_once __DIR__ . '/dashboardController.php'; // FASE A: extraerYGuardarTodas (backfill al conectar)
+
+/**
+ * FASE A: dispara el backfill de 90 dias al conectar Meta (plataforma 5). Best-effort: si la
+ * extraccion falla (token, rate-limit, red), NO rompe el alta/edicion del cliente; se logea y
+ * los datos se reintentan al abrir el dashboard (widgets_data). Salta el gate semanal a proposito
+ * (es la carga INICIAL, no un refresco) llamando directo a extraerYGuardarTodas con backfill=true.
+ */
+function ClienteController_backfillMetaSiCorresponde(int $clienteId, int $agenciaId, array $credPost): void
+{
+    if ($clienteId <= 0 || !isset($credPost[5])) { return; } // solo si se conecto Meta (plataforma 5)
+    try {
+        DashboardController_extraerYGuardarTodas($clienteId, $agenciaId, null, true);
+    } catch (\Throwable $e) {
+        error_log('FASE A backfill Meta cliente ' . $clienteId . ' fallo: ' . $e->getMessage());
+    }
+}
 
 function ClienteController_listar(int $agenciaId, ?string $q = null, int $limit = 50, int $offset = 0): array
 {
@@ -246,7 +263,12 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         exit;
     }
     
-    $ok = $model->crearClienteConCredenciales($usuarioId, $agenciaId, $nombre, $sector, $activo, $credPost);
+    $nuevoId = $model->crearClienteConCredenciales($usuarioId, $agenciaId, $nombre, $sector, $activo, $credPost);
+    $ok = $nuevoId > 0;
+    if ($ok) {
+        // FASE A: al conectar Meta, traer 90 dias de historial (best-effort, no rompe el alta).
+        ClienteController_backfillMetaSiCorresponde($nuevoId, $agenciaId, $credPost);
+    }
     echo json_encode(['success' => $ok]);
     exit;
     }
@@ -273,6 +295,10 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
     }
     
     $ok = $model->actualizarClienteConCredenciales($id, $agenciaId, $nombre, $sector, $activo, $credPost);
+    if ($ok) {
+        // FASE A: reconexion de Meta -> re-backfill 90 dias (best-effort, no rompe la edicion).
+        ClienteController_backfillMetaSiCorresponde($id, $agenciaId, $credPost);
+    }
     echo json_encode(['success' => $ok]);
     exit;
     }

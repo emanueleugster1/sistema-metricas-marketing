@@ -16,17 +16,17 @@ require_once __DIR__ . '/../api/ml/recomendadorML.php';
 function DashboardController_normalizarDias($raw): int
 {
     $d = (int)$raw;
-    return in_array($d, [30, 60, 90], true) ? $d : 30;
+    return in_array($d, [28, 60, 90], true) ? $d : 28;
 }
 
 /**
- * Traduce "dias" a un time_range {since, until} para ads insights. Para 30 dias
- * devuelve null: se conserva date_preset='last_30d' (comportamiento EXACTO previo).
- * Para 60/90 arma la ventana explicita (Meta no tiene preset last_60d).
+ * Traduce "dias" a un time_range {since, until} para ads insights. Para 28 dias
+ * devuelve null: se usa date_preset='last_28d'. Para 60/90 arma ventana explicita
+ * (Meta no tiene preset last_60d ni last_90d).
  */
 function DashboardController_calcularRangoDias(int $dias): ?array
 {
-    if ($dias === 30) {
+    if ($dias === 28) {
         return null;
     }
     return ['since' => date('Y-m-d', strtotime('-' . $dias . ' days')), 'until' => date('Y-m-d')];
@@ -84,8 +84,28 @@ function DashboardController_actualizarWidgets(int $dashboardId, array $widgetsI
         : ['success' => false, 'error' => 'error_al_actualizar_widgets'];
 }
 
-function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId): array
+
+function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId, ?array $adsTimeRange = null, bool $backfill = false): array
 {
+    // Ventana a persistir con granularidad semanal (time_increment=7) en ambos casos.
+    // Backfill (carga inicial) = 90 dias (~13 semanas).
+    // Refresh = dinamico: dias desde el ultimo dato de ads + 7 de buffer, minimo 28.
+    // Asi si el cliente no se abre por 45 dias, la ventana cubre los 45 dias sin hueco.
+    if ($adsTimeRange === null) {
+        if ($backfill) {
+            $diasVentana = 90;
+        } else {
+            $ultimaFechaAds = $mm->obtenerUltimaFechaMetrica($clienteId, 5, ['impressions', 'clicks', 'spend']);
+            $diasDesdeUltimo = $ultimaFechaAds
+                ? max(7, (int)ceil((time() - strtotime($ultimaFechaAds)) / 86400))
+                : 28;
+            $diasVentana = max($diasDesdeUltimo + 7, 28);
+        }
+        $adsTimeRange = [
+            'since' => date('Y-m-d', strtotime('-' . $diasVentana . ' days')),
+            'until' => date('Y-m-d', strtotime('-1 day')),
+        ];
+    }
     $mm = new MetricaModel();
     $cliente = $mm->obtenerClientePorId($clienteId);
     if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
@@ -107,6 +127,16 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
         $meta = new MetaConnector();
         $valid = $meta->validateToken($accessToken);
         if (!$valid['success']) continue;
+        // BUG 3: si no está guardado, derivar desde la página y persistirlo para futuras corridas.
+        if ($igBusinessId === '' && $pageId !== '') {
+            $igRes = $meta->getInstagramBusinessIdForPage($accessToken, $pageId);
+            if ($igRes['success'] ?? false) {
+                $igBusinessId = (string)($igRes['instagram_business_account_id'] ?? '');
+                if ($igBusinessId !== '') {
+                    $model->actualizarCampoCredencial($clienteId, 5, 'instagram_business_account_id', $igBusinessId);
+                }
+            }
+        }
         // Fix 2 (Tanda 2): si alguna llamada falla de forma transitoria (rate-limit /
         // 5xx / timeout), marcamos la corrida para NO persistir el lote parcial.
         $huboTransitorio = false;
@@ -115,7 +145,9 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
             return $resp;
         };
         $adsFields = ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'];
-        $pageMetrics = ['page_impressions','page_engaged_users','page_fans'];
+        // FASE 4: solo las 2 metricas de Page VIGENTES (las viejas page_impressions/engaged_users/fans
+        // fueron deprecadas por Meta el 15/06/2026 y devuelven error #100). Estas 2 van al ML.
+        $pageMetrics = ['page_views_total','page_post_engagements'];
         $igUserMetrics = ['ig_impressions','ig_reach','ig_profile_views','ig_follower_count'];
         $currency = '';
         if ($adAccountId !== '') {
@@ -124,13 +156,18 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
         }
         $adsData = [];
         if ($adAccountId !== '') {
-            $ins = $chequear($meta->insights($accessToken, $adAccountId, 'last_30d', $adsFields));
+            $ins = $chequear($meta->insights($accessToken, $adAccountId, 'last_28d', $adsFields, $adsTimeRange, 7));
             if ($ins['success']) { $adsData = $ins['data']['data'] ?? []; }
         }
         $pageInsights = [];
         if ($pageId !== '') {
-            $pis = $chequear($meta->pageInsights($accessToken, $pageId, $pageMetrics, 'days_28'));
-            if ($pis['success']) { $pageInsights = $pis['data']['data'] ?? []; }
+            // FASE 4: Page Insights exige Page Access Token (no el user token) -> error #190.
+            // Se deriva como en pagePosts. Si no se obtiene, no se persiste page (no rompe el resto).
+            $ptok = $meta->getPageAccessToken($accessToken, $pageId);
+            if ($ptok['success'] ?? false) {
+                $pis = $chequear($meta->pageInsights((string)$ptok['access_token'], $pageId, $pageMetrics, 'week', $adsTimeRange));
+                if ($pis['success']) { $pageInsights = $pis['data']['data'] ?? []; }
+            }
         }
         $igInsights = [];
         if ($igBusinessId !== '') {
@@ -152,20 +189,29 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
             $camps = $chequear($meta->campaigns($accessToken, $adAccountId, 'ACTIVE'));
             if ($camps['success']) { $campaigns = $camps['data']['data'] ?? []; }
         }
+        // FASE 5B: followers como SNAPSHOT semanal (campo directo, no insight). La API solo da
+        // el valor actual -> 1 fila por corrida con fecha de corrida (correcto: no tiene fecha
+        // historica propia, a diferencia de pauta/page que son series por dia).
+        $followersFb = null;
+        if ($pageId !== '') {
+            // followers de pagina exige Page Access Token (igual que pageInsights).
+            $ptokFb = $meta->getPageAccessToken($accessToken, $pageId);
+            if ($ptokFb['success'] ?? false) {
+                $pf = $chequear($meta->pageFollowers((string)$ptokFb['access_token'], $pageId));
+                if ($pf['success']) { $followersFb = $pf['data']['followers_count'] ?? $pf['data']['fan_count'] ?? null; }
+            }
+        }
+        $followersIg = null;
+        if ($igBusinessId !== '') {
+            $ii = $chequear($meta->instagramAccountInfo($accessToken, $igBusinessId));
+            if ($ii['success']) { $followersIg = $ii['data']['followers_count'] ?? null; }
+        }
         // Fix 2: corrida envenenada por rate-limit/transitorio -> NO persistir lote parcial.
         // Asi hayMetricasRecientes() sigue false y la proxima carga reintenta pronto.
         if ($huboTransitorio) {
             return ['success' => false, 'insertados' => 0, 'limitadoPorTasa' => true];
         }
         $nowDate = date('Y-m-d');
-        $valueFromAds = function(array $data, string $field) {
-            $sum = 0; $last = null;
-            foreach ($data as $row) {
-                $v = $row[$field] ?? null; if ($v === null) continue;
-                $num = is_numeric($v) ? (float)$v : 0.0; $sum += $num; $last = $num;
-            }
-            return $sum > 0 ? $sum : $last;
-        };
         $valueFromList = function(array $list, string $name) {
             foreach ($list as $item) {
                 if ((string)($item['name'] ?? '') !== $name) continue;
@@ -175,16 +221,39 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
             return null;
         };
         $toPersist = [];
-        foreach ($adsFields as $m) {
-            $val = $valueFromAds($adsData, $m);
-            $unidad = '';
-            if ($m === 'spend' || $m === 'cpc' || $m === 'cpm') { $unidad = $currency; }
-            if ($m === 'ctr' && is_numeric($val)) { $unidad = '%'; }
-            if (is_numeric($val)) { $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => $m, 'valor' => (float)$val, 'unidad' => $unidad]; }
+        if (!empty($adsData)) {
+            // Backfill (90d, ~13 semanas) y refresh (28d, 4 semanas) usan time_increment=7.
+            // Cada fila de la API representa 1 semana; fecha_metrica = date_start de esa semana.
+            // El UPSERT actualiza semanas existentes y agrega las nuevas -> escala homogenea para ML.
+            foreach ($adsData as $fila) {
+                $fechaFila = (string)($fila['date_start'] ?? $nowDate);
+                foreach ($adsFields as $m) {
+                    $v = $fila[$m] ?? null;
+                    if (!is_numeric($v)) { continue; }
+                    $unidad = '';
+                    if ($m === 'spend' || $m === 'cpc' || $m === 'cpm') { $unidad = $currency; }
+                    if ($m === 'ctr') { $unidad = '%'; }
+                    $toPersist[] = ['fecha_metrica' => $fechaFila, 'nombre_metrica' => $m, 'valor' => (float)$v, 'unidad' => $unidad];
+                }
+            }
         }
-        foreach ($pageMetrics as $m) {
-            $val = $valueFromList($pageInsights, $m);
-            if (is_numeric($val)) { $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => $m, 'valor' => (float)$val, 'unidad' => '']; }
+        foreach ($pageInsights as $item) {
+            $nombre = (string)($item['name'] ?? '');
+            if (!in_array($nombre, $pageMetrics, true)) { continue; }
+            $vals = $item['values'] ?? [];
+            if (empty($vals)) { continue; }
+            // Guardar todos los domingos de la ventana (backfill y refresh).
+            // UPSERT actualiza semanas existentes y agrega las faltantes.
+            foreach ($vals as $punto) {
+                $endTime = (string)($punto['end_time'] ?? '');
+                if ($endTime === '') { continue; }
+                $fecha = substr($endTime, 0, 10);
+                if ((int)date('N', strtotime($fecha)) !== 7) { continue; }
+                $v = $punto['value'] ?? null;
+                if (is_numeric($v)) {
+                    $toPersist[] = ['fecha_metrica' => $fecha, 'nombre_metrica' => $nombre, 'valor' => (float)$v, 'unidad' => ''];
+                }
+            }
         }
         $mapIg = ['ig_impressions' => 'impressions', 'ig_reach' => 'reach', 'ig_profile_views' => 'profile_views', 'ig_follower_count' => 'follower_count'];
         foreach ($igUserMetrics as $m) {
@@ -194,8 +263,11 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
         $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => 'instagram_posts', 'valor' => is_array($postsIg) ? (float)count($postsIg) : 0.0, 'unidad' => ''];
         $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => 'page_posts', 'valor' => is_array($postsFb) ? (float)count($postsFb) : 0.0, 'unidad' => ''];
         $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => 'campaigns_activas', 'valor' => is_array($campaigns) ? (float)count($campaigns) : 0.0, 'unidad' => ''];
+        // FASE 5B: followers como snapshot semanal (fecha_metrica = fecha de corrida = $nowDate).
+        if (is_numeric($followersFb)) { $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => 'followers_fb', 'valor' => (float)$followersFb, 'unidad' => '']; }
+        if (is_numeric($followersIg)) { $toPersist[] = ['fecha_metrica' => $nowDate, 'nombre_metrica' => 'followers_ig', 'valor' => (float)$followersIg, 'unidad' => '']; }
         if (!empty($toPersist)) {
-            $ok = $mm->guardarMetricasSiNoRecientes($clienteId, $toPersist);
+            $ok = $mm->guardarMetricasUpsert($clienteId, $toPersist);
             if ($ok) { $insertados += count($toPersist); }
         }
     }
@@ -209,13 +281,13 @@ function DashboardController_obtenerWidgetsDisponibles(int $plataformaId): array
     $all = $model->listarWidgetsActivos();
     $allowed = $all;
     if ($plataformaId === 5) {
-        $allowedMetrics = ['instagram_posts','page_posts','campaigns_activas','impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks','page_impressions','page_engaged_users','page_fans','ig_impressions','ig_reach','ig_profile_views','ig_follower_count'];
+        $allowedMetrics = ['instagram_posts','page_posts','campaigns_activas','impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks','page_views_total','page_post_engagements','ig_impressions','ig_reach','ig_profile_views','ig_follower_count','followers_fb','followers_ig','instagram_feed'];
         $allowed = array_values(array_filter($all, fn($w) => in_array((string)$w['metrica_principal'], $allowedMetrics, true)));
     }
     return $allowed;
 }
 
-function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int $dias = 30): array
+function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int $dias = 28): array
 {
     $dias = DashboardController_normalizarDias($dias);
     $adsTimeRange = DashboardController_calcularRangoDias($dias);
@@ -277,10 +349,8 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
                 $needPagePosts = false;
                 $needInstagramPosts = false;
                 $needCampaigns = false;
-                $needPageInsightsFields = [];
                 $needIgInsightsFields = [];
                 $adsFields = ['impressions','reach','clicks','spend','ctr','cpc','cpm','frequency','inline_link_clicks'];
-                $pageMetrics = ['page_impressions','page_engaged_users','page_fans'];
                 $igUserMetrics = ['ig_impressions','ig_reach','ig_profile_views','ig_follower_count'];
                 foreach ($visibleWidgets as $w) {
                     $m = (string)$w['metrica_principal'];
@@ -288,7 +358,6 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
                     if ($m === 'page_posts') { $needPagePosts = true; }
                     if ($m === 'instagram_posts') { $needInstagramPosts = true; }
                     if ($m === 'campaigns_activas') { $needCampaigns = true; }
-                    if (in_array($m, $pageMetrics, true)) { $needPageInsightsFields[$m] = true; }
                     if (in_array($m, $igUserMetrics, true)) { $needIgInsightsFields[$m] = true; }
                 }
                 $metricas['5'] = $metricas['5'] ?? [];
@@ -305,16 +374,12 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
                     }
                     $fields = !empty($needFields) ? array_keys($needFields) : [];
                     if (!empty($fields) && $adAccountId !== '') {
-                        $ins = $meta->insights($accessToken, $adAccountId, 'last_30d', $fields, $adsTimeRange);
+                        $ins = $meta->insights($accessToken, $adAccountId, 'last_28d', $fields, $adsTimeRange);
                         if ($ins['success']) { $metricas['5']['insights_30d'] = $ins['data']['data'] ?? []; } else { $errores[] = 'insights_error'; }
                     }
                     if ($needPagePosts && $pageId !== '') {
                         $pp = $meta->pagePosts($accessToken, $pageId, 10);
                         if ($pp['success']) { $metricas['5']['page_posts'] = $pp['data']['data'] ?? []; } else { $errores[] = 'page_posts_error'; }
-                    }
-                    if (!empty($needPageInsightsFields) && $pageId !== '') {
-                        $pis = $meta->pageInsights($accessToken, $pageId, array_keys($needPageInsightsFields), 'days_28');
-                        if ($pis['success']) { $metricas['5']['page_insights'] = $pis['data']['data'] ?? []; } else { $errores[] = 'page_insights_error'; }
                     }
                     if ($needInstagramPosts && $igBusinessId !== '') {
                         $ip = $meta->instagramPosts($accessToken, $igBusinessId, 10);
@@ -356,7 +421,7 @@ function DashboardController_obtenerResumen(int $clienteId, int $agenciaId, int 
 
     // 2. Solo generar con IA si es necesario
     if ($generarNuevaAI) {
-        $allRows = $clienteModel->obtenerMetricasPorCliente($clienteId, 5, 365);
+        $allRows = $clienteModel->obtenerMetricasPorCliente($clienteId, 5, 84);
         if (!empty($allRows)) {
             $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
             $filtered = !empty($selected) ? array_values(array_filter($allRows, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
@@ -482,44 +547,6 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath((strin
         echo json_encode($resultado);
         exit;
     }
-
-    if ($method === 'POST' && $action === 'persistir_metricas') {
-        header('Content-Type: application/json');
-        $clienteId = isset($_POST['cliente_id']) ? (int)$_POST['cliente_id'] : 0;
-        if ($clienteId <= 0) {
-            echo json_encode(['success' => false, 'error' => 'invalid_cliente_id']);
-            exit;
-        }
-        $res = DashboardController_extraerYGuardarTodas($clienteId, $agenciaId);
-        $mm = new MetricaModel();
-        $model = new DashboardModel();
-        $dashboard = $model->obtenerDashboardPorCliente($clienteId);
-        $widgets = $dashboard ? $model->obtenerWidgetsPorDashboard((int)$dashboard['id']) : [];
-        $rowsNow = $mm->obtenerMetricasPorCliente($clienteId, 5, 365);
-        $contenido = '';
-        if (!empty($rowsNow) && !empty($widgets)) {
-            $selected = array_map(fn($w) => (string)$w['metrica_principal'], array_filter($widgets, fn($w) => (int)$w['visible'] === 1));
-            $filtered = !empty($selected) ? array_values(array_filter($rowsNow, fn($r) => in_array((string)($r['nombre_metrica'] ?? ''), $selected, true))) : [];
-            if (!empty($filtered)) {
-                $rec = DashboardController_generarRecomendaciones($filtered, $selected);
-                $contenido = (string)$rec['datosMl'];
-                if ($contenido === '' && (string)$rec['mlGenerado'] !== '') { $contenido = (string)$rec['mlGenerado']; }
-            }
-        }
-        // Fix 4: no persistir recomendaciones vacias (resetean el cache de 7 dias
-        // y pueden tapar una recomendacion buena anterior).
-        if ($contenido !== '') {
-            $mm->insertarRecomendacionML($clienteId, $contenido);
-        }
-        if (isset($_POST['redirect']) && (string)$_POST['redirect'] === '1') {
-            header_remove('Content-Type');
-            header('Location: /clientes/metricas/' . $clienteId);
-            exit;
-        }
-        echo json_encode(['success' => (bool)$res['success'], 'insertados' => (int)$res['insertados']]);
-        exit;
-    }
-
 
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'error' => 'not_found']);

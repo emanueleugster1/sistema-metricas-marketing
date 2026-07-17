@@ -112,6 +112,21 @@ final class DashboardModel
         return $stmt->fetchAll() ?: [];
     }
 
+    public function actualizarCampoCredencial(int $clienteId, int $plataformaId, string $campo, string $valor): bool
+    {
+        $creds = $this->obtenerCredencialesPorPlataforma($clienteId, $plataformaId);
+        if ($creds === null) return false;
+        $creds[$campo] = $valor;
+        $nuevo = cifrarCredenciales($creds);
+        $stmt = $this->db->prepare('UPDATE credenciales_plataforma SET credenciales = ? WHERE cliente_id = ? AND plataforma_id = ?');
+        try {
+            return $stmt->execute([$nuevo, $clienteId, $plataformaId]);
+        } catch (Throwable $e) {
+            error_log($e->getMessage());
+            return false;
+        }
+    }
+
     public function garantizarWidgetsPorDefecto(): void
     {
         $sqlCount = 'SELECT COUNT(1) AS c FROM widgets WHERE activo = 1';

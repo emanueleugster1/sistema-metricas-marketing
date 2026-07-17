@@ -94,6 +94,23 @@ final class MetricaModel
         return $val !== null ? (string)$val : null;
     }
 
+    /**
+     * Fecha del ultimo dato de ads (serie semanal) para calcular el gap real de refresh.
+     * Filtra por un subconjunto de metricas de tipo serie (no snapshots como followers).
+     */
+    public function obtenerUltimaFechaMetrica(int $clienteId, int $plataformaId, array $metricas): ?string
+    {
+        if (empty($metricas)) { return null; }
+        $placeholders = implode(',', array_fill(0, count($metricas), '?'));
+        $sql = "SELECT MAX(fecha_metrica) AS ultima FROM metricas
+                WHERE cliente_id = ? AND plataforma_id = ? AND nombre_metrica IN ($placeholders)";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(array_merge([$clienteId, $plataformaId], $metricas));
+        $row = $stmt->fetch();
+        $val = $row['ultima'] ?? null;
+        return $val !== null ? (string)$val : null;
+    }
+
     public function hayMetricasRecientes(int $clienteId, int $dias = 7): bool
     {
         $dias = max(1, $dias);
@@ -103,15 +120,12 @@ final class MetricaModel
         return (bool)$stmt->fetchColumn();
     }
 
-    public function guardarMetricasSiNoRecientes(int $clienteId, array $metricas): bool
+    public function guardarMetricasUpsert(int $clienteId, array $metricas): bool
     {
         if (empty($metricas)) return true;
         $sql = 'INSERT INTO metricas (cliente_id, plataforma_id, fecha_metrica, nombre_metrica, valor, unidad, fecha_creacion)
-                SELECT ?, 5, ?, ?, ?, ?, NOW() FROM DUAL
-                WHERE NOT EXISTS (
-                   SELECT 1 FROM metricas
-                   WHERE cliente_id = ? AND plataforma_id = 5 AND nombre_metrica = ? AND fecha_creacion >= (NOW() - INTERVAL 7 DAY)
-                )';
+                VALUES (?, 5, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE valor = VALUES(valor), unidad = VALUES(unidad)';
         $stmt = $this->db->prepare($sql);
         try {
             $this->db->beginTransaction();
@@ -121,7 +135,7 @@ final class MetricaModel
                 $valor = $m['valor'] ?? null;
                 $unidad = isset($m['unidad']) ? (string)$m['unidad'] : '';
                 if ($nombre === '' || !is_numeric($valor)) continue;
-                $stmt->execute([$clienteId, $fecha, $nombre, (float)$valor, $unidad, $clienteId, $nombre]);
+                $stmt->execute([$clienteId, $fecha, $nombre, (float)$valor, $unidad]);
             }
             $this->db->commit();
             return true;
