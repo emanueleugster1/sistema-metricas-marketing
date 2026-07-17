@@ -5,7 +5,7 @@ final class GeminiConnector
 {
     private string $apiKey;
     private string $model = 'gemini-2.5-flash';
-    private string $apiUrl = 'https://generativelanguage.googleapis.com/v1/models';
+    private string $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
     private float $temperature = 0.4; // La temperatura 0.2 busca reducir creatividad y variación, priorizando respuestas objetivas y concisas
 
     public function __construct(string $apiKey)
@@ -35,6 +35,24 @@ final class GeminiConnector
             return ['success' => false, 'error' => 'curl_error', 'message' => $err];
         }
         $json = json_decode((string)$body, true);
+        // Logging persistente de cada llamada a Gemini
+        $logFile = dirname(__DIR__, 2) . '/logs/gemini.log';
+        $c0      = is_array($json) ? ($json['candidates'][0] ?? []) : [];
+        $usage   = is_array($json) ? ($json['usageMetadata']    ?? []) : [];
+        $rawTxt  = (string)($c0['content']['parts'][0]['text'] ?? '');
+        $errMsg  = ($code < 200 || $code >= 300)
+                    ? (' error=' . json_encode(is_array($json) ? ($json['error'] ?? null) : null))
+                    : '';
+        $entry   = '[' . date('Y-m-d H:i:s') . '] HTTP=' . $code
+                 . ' finishReason=' . ($c0['finishReason'] ?? 'N/A')
+                 . $errMsg . "\n"
+                 . 'tokens: prompt=' . ($usage['promptTokenCount']     ?? '-')
+                 . ' output='        . ($usage['candidatesTokenCount'] ?? '-')
+                 . ' total='         . ($usage['totalTokenCount']      ?? '-') . "\n"
+                 . 'tail: ...' . substr($rawTxt, -200) . "\n\n";
+        if (file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX) === false) {
+            error_log('[GEMINI_LOG] file_put_contents failed — ' . $entry);
+        }
         if ($code >= 200 && $code < 300) {
             return ['success' => true, 'data' => $json];
         }
@@ -87,11 +105,16 @@ final class GeminiConnector
 
         1. RESTRICCIÓN CRÍTICA (¡Importante!): La recomendación debe ser una ¡ACCIÓN DE MARKETING ESPECÍFICA! (ej. "Revisar la segmentación X", "Aumentar presupuesto en Y", "Pausar contenidos"). BAJO NINGÚN CONCEPTO DEBES SUGERIR IMPLEMENTAR SISTEMAS, HERRAMIENTAS O PROYECTOS EXTERNOS (ej. "Machine Learning", "segmentación predictiva", "nuevo dashboard").
 
-        2. LÓGICA DE DATOS INSUFICIENTES: Si la recomendación técnica de ML indica falta de datos, reporta la siguiente conclusión exacta: "Actualmente, no contamos con datos históricos suficientes para realizar una proyección fiable. Sugerimos continuar con las métricas actuales y asegurar la alimentación constante de datos para nuestro próximo análisis en 7 días."
+        2. RECOMENDACIONES ESTRATÉGICAS: Siempre generá una sección de recomendaciones, independientemente de si el ML tiene proyecciones o no. Seguí esta lógica:
+           - Si el ML provee proyecciones y tendencias: basá las recomendaciones en esos datos, citando las proyecciones concretas.
+           - Si el ML no tiene proyecciones suficientes: analizá los datos disponibles (valores actuales, comparativa histórica, tendencias parciales) y generá recomendaciones conservadoras y orientativas. Cerrá con una frase breve indicando que a medida que se acumulen más semanas de datos, el sistema podrá ofrecer proyecciones más precisas y recomendaciones más específicas.
+           En ningún caso repitas el mensaje técnico del ML sobre datos insuficientes. Siempre hablá en lenguaje de negocio, nunca en lenguaje técnico de ML.
 
-        3. Formato: Utiliza etiquetas <b> para destacar la acción principal y <br> para separar párrafos. Mantén un tono ejecutivo, directo y proactivo.
+        3. Formato: Usa SOLO etiquetas HTML. Usa <b> para títulos de sección y énfasis, <i> para términos técnicos, <br><br> para separar párrafos dentro de una misma sección. PROHIBIDO usar saltos de línea (\n) en cualquier parte de la respuesta. El output debe ser HTML puro sin ningún carácter de nueva línea. Mantén un tono ejecutivo, directo y proactivo. NÚMEROS: cuando un número termine en ,00 (es decir sea entero), escríbelo sin decimales (ej: "1.331,00" → "1.331", "5.052,00" → "5.052"); solo conservá los decimales cuando el número realmente los tenga (ej: "5,49%", "27,38", "$44.071,08"). SALTOS ENTRE SECCIONES: antes de cada título de sección (ej. antes de <b>RECOMENDACIÓN Y ACCIÓN A FUTURO</b>) agregá siempre un <br><br> para separarlo visualmente del párrafo anterior.
         
-        ¡IMPORTANTE!: NO MAS DE 350 PALABRAS.';
+        ¡IMPORTANTE!: NO MAS DE 650 PALABRAS.
+
+        ¡IMPORTANTE!: NOMBRES DE MÉTRICAS SIEMPRE EN ESPAÑOL. Nunca uses nombres técnicos en inglés al mencionar métricas. Traducciones obligatorias: "Page Views Total" → "Visitas a la página", "Page Post Engagements" → "Interacciones con publicaciones", "Clicks" → "Clics", "Reach" → "Alcance", "Impressions" → "Impresiones", "Spend" → "Inversión", "Frequency" → "Frecuencia", "Followers" → "Seguidores". Aplicá este criterio a cualquier métrica en inglés que aparezca en los datos.';
 
         $userText = $internalPrompt . "\n\nRecomendación ML:\n" . $recommendationText . "\n\nInstrucciones del usuario:\n" . $promptInstructions;
 
@@ -104,7 +127,8 @@ final class GeminiConnector
             ],
             'generationConfig' => [
                 'temperature' => $this->temperature,
-                'maxOutputTokens' => 3500,
+                'maxOutputTokens' => 8000,
+                'thinkingConfig' => ['thinkingBudget' => 1024],
             ],
         ];
 
