@@ -15,7 +15,7 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
 
 ## Acceso Rápido
 - Repositorio: `https://github.com/emanueleugster1/sistema-metricas-marketing`
-- Sistema (login): `http://54.207.61.138/views/auth/login.php`
+- Sistema (login): `http://18.230.101.179/`
 
 ## Credenciales de Prueba
 - Usuario: `admin`
@@ -31,8 +31,8 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
 ## Stack Tecnológico
 - Backend: PHP 8+ (MVC vanilla), cURL para APIs REST.
 - Base de Datos: MariaDB 10.5 (utf8mb4), 10 tablas principales.
-- Frontend: HTML5, CSS3, JavaScript ES6+, Bootstrap 5, Chart.js para visualizaciones.
-- IA/ML: Gemini Flash 2.5 para insights; `php-ml` para análisis predictivo y recomendaciones.
+- Frontend: HTML5, CSS3, JavaScript ES6+, Bootstrap Icons, Chart.js para visualizaciones.
+- IA/ML: Google Gemini 2.5 Flash (v1beta) para análisis e insights; `php-ml` para análisis predictivo y recomendaciones.
 
 ## Estructura del Proyecto
 ```
@@ -68,6 +68,8 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
 - Dashboards personalizables con widgets y visualizaciones interactivas.
 - Insights automáticos y recomendaciones estratégicas.
 - Exportación de reportes.
+- Feed de Instagram en vivo (posts ordenados por engagement).
+- Selector de rango de fechas (28/60/90 días) en dashboards.
 
 ## Estado de Integraciones
 - Cliente Flex: datos reales obtenidos con `access_token` real (nunca expuesto en código/commits).
@@ -102,7 +104,7 @@ Plataforma web para agencias que centraliza y analiza métricas de marketing dig
    - `docker compose down -v` para bajar servicios y borrar volúmenes.
 
 ## Uso (flujo básico)
-- Acceder a `views/auth/login.php` y autenticarse con las credenciales de prueba.
+- Acceder a `http://18.230.101.179/` y autenticarse con las credenciales de prueba.
 - Crear clientes y configurar credenciales de plataformas.
 - Ejecutar sincronización de métricas (manual o programada).
 - Explorar dashboards y exportar reportes.
