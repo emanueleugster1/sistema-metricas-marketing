@@ -91,6 +91,7 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
     // Backfill (carga inicial) = 90 dias (~13 semanas).
     // Refresh = dinamico: dias desde el ultimo dato de ads + 7 de buffer, minimo 28.
     // Asi si el cliente no se abre por 45 dias, la ventana cubre los 45 dias sin hueco.
+    $mm = new MetricaModel();
     if ($adsTimeRange === null) {
         if ($backfill) {
             $diasVentana = 90;
@@ -106,7 +107,6 @@ function DashboardController_extraerYGuardarTodas(int $clienteId, int $agenciaId
             'until' => date('Y-m-d', strtotime('-1 day')),
         ];
     }
-    $mm = new MetricaModel();
     $cliente = $mm->obtenerClientePorId($clienteId);
     if ($cliente === null || (int)$cliente['agencia_id'] !== $agenciaId) {
         return ['success' => false, 'insertados' => 0];
